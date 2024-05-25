@@ -11,7 +11,13 @@ func TestPlayerCacheImpl(t *testing.T) {
 	t.Run("Set and get", func(t *testing.T) {
 		playerCache := NewPlayerCache(1000 * time.Second)
 
+		longTermValueBefore := playerCache.getLongTerm("test")
+		assert.False(t, longTermValueBefore.valid)
+
 		playerCache.set("test", []byte("test"), 200)
+
+		longTermValue := playerCache.getLongTerm("test")
+		assert.Equal(t, "test", string(longTermValue.data))
 
 		value, claimed := playerCache.getOrClaim("test")
 		assert.False(t, claimed, "Expected entry to exist")
@@ -36,8 +42,14 @@ func TestPlayerCacheImpl(t *testing.T) {
 
 		playerCache.delete("test")
 
+		longTermValue := playerCache.getLongTerm("test")
+		assert.Equal(t, "test", string(longTermValue.data), "shouldn't delete long term value")
+
 		_, claimed := playerCache.getOrClaim("test")
 		assert.True(t, claimed, "Expected to not find a value")
+
+		longTermValueAfterClaim := playerCache.getLongTerm("test")
+		assert.Equal(t, "test", string(longTermValueAfterClaim.data), "claim shouldn't change long term value")
 	})
 
 	t.Run("delete missing entry", func(t *testing.T) {

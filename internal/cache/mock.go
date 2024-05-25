@@ -6,7 +6,8 @@ import (
 )
 
 type mockedPlayerCache struct {
-	cache map[string]cachedResponse
+	cache         map[string]cachedResponse
+	longTermCache map[string]cachedResponse
 }
 
 func (playerCache *mockedPlayerCache) getOrClaim(uuid string) (cachedResponse, bool) {
@@ -18,8 +19,18 @@ func (playerCache *mockedPlayerCache) getOrClaim(uuid string) (cachedResponse, b
 	return invalid, true
 }
 
+func (playerCache *mockedPlayerCache) getLongTerm(uuid string) cachedResponse {
+	response, ok := playerCache.longTermCache[uuid]
+	if !ok {
+		return invalid
+	}
+	return response
+}
+
 func (playerCache *mockedPlayerCache) set(uuid string, data []byte, statusCode int) {
-	playerCache.cache[uuid] = cachedResponse{data: data, statusCode: statusCode, valid: true}
+	response := cachedResponse{data: data, statusCode: statusCode, valid: true}
+	playerCache.cache[uuid] = response
+	playerCache.longTermCache[uuid] = response
 }
 
 func (playerCache *mockedPlayerCache) delete(uuid string) {
@@ -31,7 +42,8 @@ func (playerCache *mockedPlayerCache) wait() {
 
 func NewMockedPlayerCache() *mockedPlayerCache {
 	return &mockedPlayerCache{
-		cache: make(map[string]cachedResponse),
+		cache:         make(map[string]cachedResponse),
+		longTermCache: make(map[string]cachedResponse),
 	}
 }
 
@@ -42,6 +54,8 @@ type mockCacheValue struct {
 
 type mockPlayerCacheServer struct {
 	cache             map[string]mockCacheValue
+	longTermCache     map[string]mockCacheValue
+	cacheExpiration   int
 	lock              sync.Mutex
 	currentTick       int
 	maxTicks          int
@@ -56,15 +70,25 @@ type mockPlayerCacheClient struct {
 
 func (cacheClient *mockPlayerCacheClient) getOrClaim(uuid string) (cachedResponse, bool) {
 	oldValue, ok := cacheClient.server.cache[uuid]
-	if ok {
+	if ok && !cacheClient.server.cacheEntryHasExpired(oldValue) {
 		return oldValue.cachedResponse, false
 	}
 	cacheClient.server.cache[uuid] = mockCacheValue{cachedResponse: invalid, insertedAt: cacheClient.server.currentTick}
 	return invalid, true
 }
 
+func (cacheClient *mockPlayerCacheClient) getLongTerm(uuid string) cachedResponse {
+	value, ok := cacheClient.server.longTermCache[uuid]
+	if !ok {
+		return invalid
+	}
+	return value.cachedResponse
+}
+
 func (cacheClient *mockPlayerCacheClient) set(uuid string, data []byte, statusCode int) {
-	cacheClient.server.cache[uuid] = mockCacheValue{cachedResponse: cachedResponse{data: data, statusCode: statusCode, valid: true}, insertedAt: cacheClient.server.currentTick}
+	newValue := mockCacheValue{cachedResponse: cachedResponse{data: data, statusCode: statusCode, valid: true}, insertedAt: cacheClient.server.currentTick}
+	cacheClient.server.cache[uuid] = newValue
+	cacheClient.server.longTermCache[uuid] = newValue
 }
 
 func (cacheClient *mockPlayerCacheClient) delete(uuid string) {
@@ -93,6 +117,10 @@ func (cacheClient *mockPlayerCacheClient) waitUntilDone() {
 	}
 }
 
+func (cacheServer *mockPlayerCacheServer) cacheEntryHasExpired(entry mockCacheValue) bool {
+	return entry.insertedAt+cacheServer.cacheExpiration <= cacheServer.currentTick
+}
+
 func (cacheServer *mockPlayerCacheServer) isDone() bool {
 	return cacheServer.currentTick >= cacheServer.maxTicks
 }
@@ -114,6 +142,8 @@ func (cacheServer *mockPlayerCacheServer) processTicks() {
 func NewMockPlayerCacheServer(numGoroutines int, maxTicks int) (*mockPlayerCacheServer, []*mockPlayerCacheClient) {
 	server := &mockPlayerCacheServer{
 		cache:             make(map[string]mockCacheValue),
+		longTermCache:     make(map[string]mockCacheValue),
+		cacheExpiration:   1000,
 		lock:              sync.Mutex{},
 		currentTick:       0,
 		maxTicks:          maxTicks,

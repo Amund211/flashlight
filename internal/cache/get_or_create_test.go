@@ -158,3 +158,54 @@ func TestGetOrCreateErrorRetries(t *testing.T) {
 
 	server.processTicks()
 }
+
+func TestGetOrCreateErrorFallbackToLongTerm(t *testing.T) {
+	server, clients := NewMockPlayerCacheServer(2, 1010)
+
+	go func() {
+		client := clients[0]
+		GetOrCreateCachedResponse(context.Background(), client, "uuid1", createCallback(1, 200))
+		GetOrCreateCachedResponse(context.Background(), client, "uuid2", createCallback(2, 200))
+
+		client.waitUntilDone()
+	}()
+
+	go func() {
+		client := clients[1]
+		client.wait()
+		for i := 0; i < 999; i++ {
+			// These calls should get from the cache
+			data1, _, _ := GetOrCreateCachedResponse(context.Background(), client, "uuid1", createUnreachable(t))
+			data2, _, _ := GetOrCreateCachedResponse(context.Background(), client, "uuid2", createUnreachable(t))
+			assert.Equal(t, "data1", string(data1))
+			assert.Equal(t, "data2", string(data2))
+			client.wait()
+		}
+
+		// After 1000 ticks, the cache is expired
+
+		// A successful call should return the new result
+		data1, _, _ := GetOrCreateCachedResponse(context.Background(), client, "uuid1", createCallback(11, 200))
+		assert.Equal(t, "data11", string(data1))
+
+		// A failed call should fall back to the long term cache
+		data2, _, err := GetOrCreateCachedResponse(context.Background(), client, "uuid2", createErrorCallback(1))
+		assert.NoError(t, err)
+		assert.Equal(t, "data2", string(data2))
+
+		// A failed call should fail like normal if the long term cache is empty
+		_, _, err = GetOrCreateCachedResponse(context.Background(), client, "uuid3", createErrorCallback(1))
+		assert.Error(t, err)
+
+		client.wait()
+
+		// A successful call should return the new result after using the long term cache
+		data2, _, err = GetOrCreateCachedResponse(context.Background(), client, "uuid2", createCallback(22, 200))
+		assert.NoError(t, err)
+		assert.Equal(t, "data22", string(data2))
+
+		client.waitUntilDone()
+	}()
+
+	server.processTicks()
+}

@@ -30,6 +30,13 @@ func GetOrCreateCachedResponse(ctx context.Context, playerCache PlayerCache, uui
 
 			data, statusCode, err := create()
 			if err != nil {
+				longTermValue := playerCache.getLongTerm(uuid)
+				if longTermValue.valid {
+					logger.Info("Lookup in long term cache", "cache", "hit")
+					return longTermValue.data, longTermValue.statusCode, nil
+				}
+
+				logger.Info("Lookup in long term cache", "cache", "miss")
 				return []byte{}, -1, err
 			}
 
