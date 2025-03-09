@@ -589,4 +589,102 @@ func TestPostgresStatsPersistor(t *testing.T) {
 			})
 		})
 	})
+
+	t.Run("GetSessions", func(t *testing.T) {
+		t.Parallel()
+		type storageInstruction struct {
+			uuid      string
+			queriedAt time.Time
+			player    *processing.HypixelAPIPlayer
+		}
+
+		storeStats := func(t *testing.T, p *PostgresStatsPersistor, instructions ...storageInstruction) {
+			t.Helper()
+			for _, instruction := range instructions {
+				err := p.StoreStats(ctx, instruction.uuid, instruction.player, instruction.queriedAt)
+				require.NoError(t, err)
+			}
+		}
+
+		newPlayer := func(uuid string, gamesPlayed int, exp float64) *processing.HypixelAPIPlayer {
+			return &processing.HypixelAPIPlayer{
+				Stats: &processing.HypixelAPIStats{
+					Bedwars: &processing.HypixelAPIBedwarsStats{
+						Experience:  &exp,
+						GamesPlayed: &gamesPlayed,
+					},
+				},
+			}
+		}
+
+		t.Run("random clusters", func(t *testing.T) {
+			t.Parallel()
+			p := newPostgresPersistor(t, db, "get_history_random_clusters")
+			player_uuid := newUUID(t)
+			start := time.Date(2021, time.January, 1, 0, 0, 0, 0, time.FixedZone("UTC", -3600*8))
+
+			instructions := make([]storageInstruction, 13)
+			// Before start
+			instructions[0] = storageInstruction{player_uuid, start.Add(0 * time.Hour).Add(-1 * time.Minute), newHypixelAPIPlayer(0)}
+
+			// First 30 min interval
+			instructions[1] = storageInstruction{player_uuid, start.Add(0 * time.Hour).Add(7 * time.Minute), newHypixelAPIPlayer(1)}
+			instructions[2] = storageInstruction{player_uuid, start.Add(0 * time.Hour).Add(17 * time.Minute), newHypixelAPIPlayer(2)}
+
+			// Second 30 min interval
+			instructions[3] = storageInstruction{player_uuid, start.Add(0 * time.Hour).Add(37 * time.Minute), newHypixelAPIPlayer(3)}
+
+			// Sixth 30 min interval
+			instructions[4] = storageInstruction{player_uuid, start.Add(2 * time.Hour).Add(40 * time.Minute), newHypixelAPIPlayer(4)}
+			instructions[5] = storageInstruction{player_uuid, start.Add(2 * time.Hour).Add(45 * time.Minute), newHypixelAPIPlayer(5)}
+			instructions[6] = storageInstruction{player_uuid, start.Add(2 * time.Hour).Add(50 * time.Minute), newHypixelAPIPlayer(6)}
+			instructions[7] = storageInstruction{player_uuid, start.Add(2 * time.Hour).Add(55 * time.Minute), newHypixelAPIPlayer(7)}
+
+			// Seventh 30 min interval
+			instructions[8] = storageInstruction{player_uuid, start.Add(3 * time.Hour).Add(1 * time.Minute), newHypixelAPIPlayer(8)}
+
+			// Eighth 30 min interval
+			instructions[9] = storageInstruction{player_uuid, start.Add(3 * time.Hour).Add(47 * time.Minute), newHypixelAPIPlayer(9)}
+			instructions[10] = storageInstruction{player_uuid, start.Add(3 * time.Hour).Add(59 * time.Minute), newHypixelAPIPlayer(10)}
+
+			// After end
+			instructions[11] = storageInstruction{player_uuid, start.Add(4 * time.Hour).Add(1 * time.Minute), newHypixelAPIPlayer(11)}
+			instructions[12] = storageInstruction{player_uuid, start.Add(4000 * time.Hour).Add(1 * time.Minute), newHypixelAPIPlayer(12)}
+
+			storeStats(t, p, instructions...)
+
+			// Get entries at the start and end of each 30 min interval (8 in total)
+			history, err := p.GetHistory(ctx, player_uuid, start, start.Add(4*time.Hour), 16)
+			require.NoError(t, err)
+
+			expectedHistory := []storageInstruction{
+				instructions[1],
+				instructions[2],
+
+				instructions[3],
+
+				instructions[4],
+				instructions[7],
+
+				instructions[8],
+
+				instructions[9],
+				instructions[10],
+			}
+
+			require.Len(t, history, len(expectedHistory))
+
+			for i, expectedPIT := range expectedHistory {
+				playerPIT := history[i]
+
+				require.Equal(t, player_uuid, expectedPIT.uuid)
+				require.Equal(t, player_uuid, playerPIT.UUID)
+
+				// Mock data matches
+				require.Equal(t, *expectedPIT.player.Stats.Bedwars.Kills, *playerPIT.Overall.Kills)
+
+				require.WithinDuration(t, expectedPIT.queriedAt, playerPIT.QueriedAt, 0)
+			}
+		})
+	})
 }

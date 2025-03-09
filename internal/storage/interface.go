@@ -37,3 +37,8 @@ type StatsPIT struct {
 	Kills       *int
 	Deaths      *int
 }
+
+type Session struct {
+	start PlayerDataPIT
+	end   PlayerDataPIT
+}

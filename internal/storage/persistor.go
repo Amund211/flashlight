@@ -399,6 +399,124 @@ func (p *PostgresStatsPersistor) GetHistory(ctx context.Context, playerUUID stri
 	return result, nil
 }
 
+func (p *PostgresStatsPersistor) GetSessions(ctx context.Context, playerUUID string, start, end time.Time) ([]Session, error) {
+	timespan := end.Sub(start)
+	if timespan <= 0 {
+		// TODO: Use known error
+		return nil, fmt.Errorf("GetSessions: end time must be after start time")
+	}
+	if timespan >= 60*24*time.Hour {
+		// TODO: Use known error
+		return nil, fmt.Errorf("GetSessions: interval too long")
+	}
+
+	// Add some padding on both sides to try to complete sessions that cross the interval borders
+	filterStart := start.Add(-24 * time.Hour)
+	filterEnd := end.Add(24 * time.Hour)
+
+	dbStats := []dbStat{}
+
+	conn, err := p.db.Connx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("GetSessions: failed to get connection: %w", err)
+	}
+	defer conn.Close()
+
+	lastID := "00000000-0000-0000-0000-000000000000"
+	for true {
+		batch := make([]dbStat, 0, 100)
+		// TODO: Index on (id, player_uuid, queried_at)?
+		err = conn.SelectContext(
+			ctx,
+			&batch,
+			`select
+				id, data_format_version, player_uuid, queried_at, player_data
+			from stats
+			where
+				id > $1 and
+				player_uuid = $2 and
+				queried_at >= $3 and
+				queried_at <= $4
+			order by queried_at asc
+			limit 100`,
+			lastID, playerUUID, filterStart, filterEnd)
+		if err != nil {
+			return nil, fmt.Errorf("GetSessions: failed to select: %w", err)
+		}
+		if len(batch) == 0 {
+			break
+		}
+		dbStats = append(dbStats, batch...)
+	}
+
+	if len(dbStats) == 0 {
+		return nil, nil
+	}
+
+	stats := make([]PlayerDataPIT, 0, len(dbStats))
+	for _, dbStat := range dbStats {
+		playerData, err := dbStatToPlayerDataPIT(dbStat)
+		if err != nil {
+			return nil, fmt.Errorf("GetSessions: failed to convert db stat: %w", err)
+		}
+		stats = append(stats, *playerData)
+	}
+
+	sessions := []Session{}
+
+	getProgressStats := func(stat *PlayerDataPIT) (int, float64) {
+		gamesPlayed := 0
+		if stat.Overall.GamesPlayed != nil {
+			gamesPlayed = *stat.Overall.GamesPlayed
+		}
+		experience := 0.0
+		if stat.Experience != nil {
+			experience = *stat.Experience
+		}
+
+		return gamesPlayed, experience
+	}
+
+	var sessionStart *PlayerDataPIT
+	var lastEventfulEntry *PlayerDataPIT
+	for _, stat := range stats {
+		if sessionStart == nil || lastEventfulEntry == nil {
+			sessionStart = &stat
+			lastEventfulEntry = &stat
+			continue
+		}
+
+		// If no activity since session start, move session start to this
+		startGamesPlayed, startExperience := getProgressStats(sessionStart)
+		currentGamesPlayed, currentExperience := getProgressStats(&stat)
+		if currentGamesPlayed == startGamesPlayed && currentExperience == startExperience {
+			sessionStart = &stat
+			lastEventfulEntry = &stat
+			continue
+		}
+
+		// If more than 60 minutes since last activity, end session
+		if stat.QueriedAt.Sub(lastEventfulEntry.QueriedAt) > 60*time.Minute {
+			// Only return sessions with at least 2 entries
+			if lastEventfulEntry != sessionStart &&
+				// Only return sessions that overlap with the requested interval
+				sessionStart.QueriedAt.After(start) && lastEventfulEntry.QueriedAt.Before(end) {
+				sessions = append(sessions, Session{*sessionStart, *lastEventfulEntry})
+			}
+			sessionStart = &stat
+			lastEventfulEntry = &stat
+			continue
+		}
+
+		lastEventfulGamesPlayed, lastEventfulExperience := getProgressStats(lastEventfulEntry)
+		if lastEventfulGamesPlayed != currentGamesPlayed || lastEventfulExperience != currentExperience {
+			lastEventfulEntry = &stat
+		}
+	}
+
+	return sessions, nil
+}
+
 type StubPersistor struct{}
 
 func (p *StubPersistor) StoreStats(ctx context.Context, playerUUID string, player *processing.HypixelAPIPlayer, queriedAt time.Time) error {
