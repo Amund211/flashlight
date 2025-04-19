@@ -12,15 +12,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Amund211/flashlight/internal/adapters/playerprovider"
+	"github.com/Amund211/flashlight/internal/adapters/playerrepository"
 	"github.com/Amund211/flashlight/internal/cache"
 	"github.com/Amund211/flashlight/internal/config"
+	"github.com/Amund211/flashlight/internal/domain"
 	"github.com/Amund211/flashlight/internal/getstats"
-	"github.com/Amund211/flashlight/internal/hypixel"
 	"github.com/Amund211/flashlight/internal/logging"
 	"github.com/Amund211/flashlight/internal/ratelimiting"
 	"github.com/Amund211/flashlight/internal/reporting"
 	"github.com/Amund211/flashlight/internal/server"
-	"github.com/Amund211/flashlight/internal/storage"
 	"github.com/google/uuid"
 )
 
@@ -68,11 +69,13 @@ func main() {
 	httpClient := &http.Client{
 		Timeout: 10 * time.Second,
 	}
-	hypixelAPI, err := hypixel.NewHypixelAPIOrMock(config, httpClient)
+	hypixelAPI, err := playerprovider.NewHypixelAPIOrMock(config, httpClient)
 	if err != nil {
 		fail("Failed to initialize Hypixel API", "error", err.Error())
 	}
 	logger.Info("Initialized Hypixel API")
+
+	provider := playerprovider.NewHypixelPlayerProvider(hypixelAPI)
 
 	ipRateLimiter := ratelimiting.NewRequestBasedRateLimiter(
 		ratelimiting.NewTokenBucketRateLimiter(
@@ -97,11 +100,11 @@ func main() {
 	defer flush()
 	logger.Info("Initialized Sentry middleware")
 
-	persistor, err := storage.NewPostgresStatsPersistorOrMock(config, logger)
+	repo, err := playerrepository.NewPostgresPlayerRepositoryOrMock(config, logger)
 	if err != nil {
-		fail("Failed to initialize PostgresStatsPersistor", "error", err.Error())
+		fail("Failed to initialize PostgresPlayerRepository", "error", err.Error())
 	}
-	logger.Info("Initialized StatsPersistor")
+	logger.Info("Initialized PlayerRepository")
 
 	middleware := server.ComposeMiddlewares(
 		logging.NewRequestLoggerMiddleware(logger.With("component", "getPlayerData")),
@@ -115,7 +118,7 @@ func main() {
 		middleware(
 			server.MakeGetPlayerDataHandler(
 				func(ctx context.Context, uuid string) ([]byte, int, error) {
-					return getstats.GetOrCreateProcessedPlayerData(ctx, playerCache, hypixelAPI, persistor, uuid)
+					return getstats.GetOrCreateProcessedPlayerData(ctx, playerCache, provider, repo, uuid)
 				},
 			),
 		),
@@ -160,7 +163,7 @@ func main() {
 					return
 				}
 
-				history, err := persistor.GetHistory(r.Context(), request.UUID, request.Start, request.End, request.Limit)
+				history, err := repo.GetHistory(r.Context(), request.UUID, request.Start, request.End, request.Limit)
 				if err != nil {
 					http.Error(w, "Failed to get history", http.StatusInternalServerError)
 					return
@@ -168,31 +171,29 @@ func main() {
 
 				type statsResponse struct {
 					Winstreak   *int `json:"winstreak"`
-					GamesPlayed *int `json:"gamesPlayed"`
-					Wins        *int `json:"wins"`
-					Losses      *int `json:"losses"`
-					BedsBroken  *int `json:"bedsBroken"`
-					BedsLost    *int `json:"bedsLost"`
-					FinalKills  *int `json:"finalKills"`
-					FinalDeaths *int `json:"finalDeaths"`
-					Kills       *int `json:"kills"`
-					Deaths      *int `json:"deaths"`
+					GamesPlayed int  `json:"gamesPlayed"`
+					Wins        int  `json:"wins"`
+					Losses      int  `json:"losses"`
+					BedsBroken  int  `json:"bedsBroken"`
+					BedsLost    int  `json:"bedsLost"`
+					FinalKills  int  `json:"finalKills"`
+					FinalDeaths int  `json:"finalDeaths"`
+					Kills       int  `json:"kills"`
+					Deaths      int  `json:"deaths"`
 				}
 
 				type playerDataResponse struct {
-					ID                string        `json:"id"`
-					DataFormatVersion int           `json:"dataFormatVersion"`
-					UUID              string        `json:"uuid"`
-					QueriedAt         time.Time     `json:"queriedAt"`
-					Experience        *float64      `json:"experience"`
-					Solo              statsResponse `json:"solo"`
-					Doubles           statsResponse `json:"doubles"`
-					Threes            statsResponse `json:"threes"`
-					Fours             statsResponse `json:"fours"`
-					Overall           statsResponse `json:"overall"`
+					UUID       string        `json:"uuid"`
+					QueriedAt  time.Time     `json:"queriedAt"`
+					Experience float64       `json:"experience"`
+					Solo       statsResponse `json:"solo"`
+					Doubles    statsResponse `json:"doubles"`
+					Threes     statsResponse `json:"threes"`
+					Fours      statsResponse `json:"fours"`
+					Overall    statsResponse `json:"overall"`
 				}
 
-				pitStatsToResponse := func(stats storage.StatsPIT) statsResponse {
+				pitStatsToResponse := func(stats domain.GamemodeStatsPIT) statsResponse {
 					return statsResponse{
 						Winstreak:   stats.Winstreak,
 						GamesPlayed: stats.GamesPlayed,
@@ -211,16 +212,14 @@ func main() {
 
 				for _, data := range history {
 					responseData = append(responseData, playerDataResponse{
-						ID:                data.ID,
-						DataFormatVersion: data.DataFormatVersion,
-						UUID:              data.UUID,
-						QueriedAt:         data.QueriedAt,
-						Experience:        data.Experience,
-						Solo:              pitStatsToResponse(data.Solo),
-						Doubles:           pitStatsToResponse(data.Doubles),
-						Threes:            pitStatsToResponse(data.Threes),
-						Fours:             pitStatsToResponse(data.Fours),
-						Overall:           pitStatsToResponse(data.Overall),
+						UUID:       data.UUID,
+						QueriedAt:  data.QueriedAt,
+						Experience: data.Experience,
+						Solo:       pitStatsToResponse(data.Solo),
+						Doubles:    pitStatsToResponse(data.Doubles),
+						Threes:     pitStatsToResponse(data.Threes),
+						Fours:      pitStatsToResponse(data.Fours),
+						Overall:    pitStatsToResponse(data.Overall),
 					})
 				}
 
@@ -275,7 +274,7 @@ func main() {
 					return
 				}
 
-				sessions, err := persistor.GetSessions(r.Context(), request.UUID, request.Start, request.End)
+				sessions, err := repo.GetSessions(r.Context(), request.UUID, request.Start, request.End)
 				if err != nil {
 					http.Error(w, "Failed to get sessions", http.StatusInternalServerError)
 					return
@@ -283,15 +282,15 @@ func main() {
 
 				type statsResponse struct {
 					Winstreak   *int `json:"winstreak"`
-					GamesPlayed *int `json:"gamesPlayed"`
-					Wins        *int `json:"wins"`
-					Losses      *int `json:"losses"`
-					BedsBroken  *int `json:"bedsBroken"`
-					BedsLost    *int `json:"bedsLost"`
-					FinalKills  *int `json:"finalKills"`
-					FinalDeaths *int `json:"finalDeaths"`
-					Kills       *int `json:"kills"`
-					Deaths      *int `json:"deaths"`
+					GamesPlayed int  `json:"gamesPlayed"`
+					Wins        int  `json:"wins"`
+					Losses      int  `json:"losses"`
+					BedsBroken  int  `json:"bedsBroken"`
+					BedsLost    int  `json:"bedsLost"`
+					FinalKills  int  `json:"finalKills"`
+					FinalDeaths int  `json:"finalDeaths"`
+					Kills       int  `json:"kills"`
+					Deaths      int  `json:"deaths"`
 				}
 
 				type playerDataResponse struct {
@@ -299,7 +298,7 @@ func main() {
 					DataFormatVersion int           `json:"dataFormatVersion"`
 					UUID              string        `json:"uuid"`
 					QueriedAt         time.Time     `json:"queriedAt"`
-					Experience        *float64      `json:"experience"`
+					Experience        float64       `json:"experience"`
 					Solo              statsResponse `json:"solo"`
 					Doubles           statsResponse `json:"doubles"`
 					Threes            statsResponse `json:"threes"`
@@ -313,7 +312,7 @@ func main() {
 					Consecutive bool               `json:"consecutive"`
 				}
 
-				pitStatsToResponse := func(stats storage.StatsPIT) statsResponse {
+				pitStatsToResponse := func(stats domain.GamemodeStatsPIT) statsResponse {
 					return statsResponse{
 						Winstreak:   stats.Winstreak,
 						GamesPlayed: stats.GamesPlayed,
@@ -328,18 +327,16 @@ func main() {
 					}
 				}
 
-				playerDataToResponse := func(data storage.PlayerDataPIT) playerDataResponse {
+				playerDataToResponse := func(data domain.PlayerPIT) playerDataResponse {
 					return playerDataResponse{
-						ID:                data.ID,
-						DataFormatVersion: data.DataFormatVersion,
-						UUID:              data.UUID,
-						QueriedAt:         data.QueriedAt,
-						Experience:        data.Experience,
-						Solo:              pitStatsToResponse(data.Solo),
-						Doubles:           pitStatsToResponse(data.Doubles),
-						Threes:            pitStatsToResponse(data.Threes),
-						Fours:             pitStatsToResponse(data.Fours),
-						Overall:           pitStatsToResponse(data.Overall),
+						UUID:       data.UUID,
+						QueriedAt:  data.QueriedAt,
+						Experience: data.Experience,
+						Solo:       pitStatsToResponse(data.Solo),
+						Doubles:    pitStatsToResponse(data.Doubles),
+						Threes:     pitStatsToResponse(data.Threes),
+						Fours:      pitStatsToResponse(data.Fours),
+						Overall:    pitStatsToResponse(data.Overall),
 					}
 				}
 
@@ -372,7 +369,7 @@ func main() {
 		middleware(
 			server.MakeGetPlayerDataHandler(
 				func(ctx context.Context, uuid string) ([]byte, int, error) {
-					return getstats.GetOrCreateProcessedPlayerData(ctx, playerCache, hypixelAPI, persistor, uuid)
+					return getstats.GetOrCreateProcessedPlayerData(ctx, playerCache, provider, repo, uuid)
 				},
 			),
 		),

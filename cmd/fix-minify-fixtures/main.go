@@ -3,58 +3,81 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"encoding/json"
 	"log"
 	"os"
 	"path"
+	"time"
 
-	"github.com/Amund211/flashlight/internal/processing"
+	"github.com/Amund211/flashlight/internal/adapters/playerprovider"
+	"github.com/Amund211/flashlight/internal/strutils"
 )
 
-const minifyFixtureDir = "./internal/processing/fixtures/"
-
-func parseMinifyFixtureFile(filePath string) ([]byte, []byte, error) {
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, nil, fmt.Errorf("Error reading file %s: %s", filePath, err.Error())
-	}
-	lines := bytes.Split(data, []byte("\n"))
-	if len(lines) < 2 {
-		return nil, nil, fmt.Errorf("File %s should have at least 2 lines", filePath)
-	} else if len(lines) > 2 {
-		log.Printf("Warning: File %s has more than 2 lines, only the first 2 will be used", filePath)
-	}
-	return lines[0], lines[1], nil
-}
+const hypixelAPIResponsesDir = "./fixtures/hypixel_api_responses/"
+const expectedMinifiedDataDir = "./internal/adapters/playerprovider/testdata/expected_minified_data/"
 
 func main() {
-	files, err := os.ReadDir(minifyFixtureDir)
+	hypixelAPIResponseFiles, err := os.ReadDir(hypixelAPIResponsesDir)
 	if err != nil {
-		log.Fatalf("Error reading fixtures directory: %s", err.Error())
+		log.Fatalf("Error reading hypixel api responses directory: %s", err.Error())
 	}
 
-	for _, file := range files {
-		if file.IsDir() {
+	for _, hypixelAPIResponseFile := range hypixelAPIResponseFiles {
+		if hypixelAPIResponseFile.IsDir() {
 			continue
 		}
-		filePath := path.Join(minifyFixtureDir, file.Name())
-		playerData, oldMinified, err := parseMinifyFixtureFile(filePath)
+		fileName := hypixelAPIResponseFile.Name()
+		hypixelAPIResponse, err := os.ReadFile(path.Join(hypixelAPIResponsesDir, fileName))
 		if err != nil {
-			log.Printf("Error parsing file %s: %s", filePath, err.Error())
+			log.Printf("Error reading hypixel api response file %s: %s", fileName, err.Error())
 			continue
 		}
-		parsedAPIResponse, _, err := processing.ParseHypixelAPIResponse(context.Background(), playerData, 200)
-		newMinified, err := processing.MarshalPlayerData(context.Background(), parsedAPIResponse)
+		expectedMinifiedDataPath := path.Join(expectedMinifiedDataDir, fileName)
+		expectedMinifiedData, err := os.ReadFile(expectedMinifiedDataPath)
+		if err != nil {
+			expectedMinifiedData = nil
+		}
+
+		parsedAPIResponse, err := playerprovider.ParseHypixelAPIResponse(context.Background(), hypixelAPIResponse)
+		if err != nil {
+			log.Printf("Error initially parsing hypixel api response %s: %s", fileName, err.Error())
+			continue
+		}
+
+		uuid := "12345678-1234-1234-1234-12345678abcd"
+		if parsedAPIResponse.Player != nil && parsedAPIResponse.Player.UUID != nil {
+			normalizedUUID, err := strutils.NormalizeUUID(*parsedAPIResponse.Player.UUID)
+			if err != nil {
+				log.Fatalf("Error normalizing UUID: %s", err.Error())
+			}
+			uuid = normalizedUUID
+		}
+
+		player, err := playerprovider.HypixelAPIResponseToPlayerPIT(context.Background(), uuid, time.Now(), hypixelAPIResponse, 200)
+		if err != nil {
+			log.Printf("Error parsing hypixel api response %s: %s", fileName, err.Error())
+			continue
+		}
+
+		apiResponseFromDomain := playerprovider.DomainPlayerToHypixelAPIResponse(player)
+
+		newMinified, err := playerprovider.MarshalPlayerData(context.Background(), apiResponseFromDomain)
 		if err != nil {
 			log.Printf("Error minifying player data: %s", err.Error())
 			continue
 		}
 
-		newFixture := bytes.Join([][]byte{playerData, newMinified}, []byte("\n"))
+		indented := bytes.NewBuffer(nil)
+		err = json.Indent(indented, newMinified, "", "  ")
+		if err != nil {
+			log.Fatalf("Error indenting JSON: %s", err.Error())
+		}
 
-		if !bytes.Equal(newMinified, oldMinified) {
-			log.Printf("Updating fixture %s", filePath)
-			os.WriteFile(filePath, newFixture, 0644)
+		indentedBytes := indented.Bytes()
+
+		if !bytes.Equal(indentedBytes, expectedMinifiedData) {
+			log.Printf("Updating fixture %s", fileName)
+			os.WriteFile(expectedMinifiedDataPath, indentedBytes, 0644)
 		}
 	}
 }
