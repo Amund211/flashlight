@@ -11,30 +11,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type mockHistoryRepository struct {
+type mockSessionsRepository struct {
 	playerrepository.StubPlayerRepository
-	history []domain.PlayerPIT
-	err     error
+	sessions []domain.Session
+	err      error
 }
 
-func (m *mockHistoryRepository) GetHistory(ctx context.Context, playerUUID string, start, end time.Time, limit int) ([]domain.PlayerPIT, error) {
-	return m.history, m.err
+func (m *mockSessionsRepository) GetSessions(ctx context.Context, playerUUID string, start, end time.Time) ([]domain.Session, error) {
+	return m.sessions, m.err
 }
 
-func newMockHistoryRepository(t *testing.T, history []domain.PlayerPIT, err error) *mockHistoryRepository {
+func newMockSessionsRepository(t *testing.T, sessions []domain.Session, err error) *mockSessionsRepository {
 	if err == nil {
-		require.NotNil(t, history)
+		require.NotNil(t, sessions)
 	} else {
-		require.Nil(t, history)
+		require.Nil(t, sessions)
 	}
 
-	return &mockHistoryRepository{
-		history: history,
-		err:     err,
+	return &mockSessionsRepository{
+		sessions: sessions,
+		err:      err,
 	}
 }
 
-func newGetAndPersistPlayerWithCacheForHistory(err error) app.GetAndPersistPlayerWithCache {
+func newGetAndPersistPlayerWithCacheForSessions(err error) app.GetAndPersistPlayerWithCache {
 	return func(ctx context.Context, uuid string) (*domain.PlayerPIT, error) {
 		// NOTE: We don't read the value in GetHistory, only the error
 		return &domain.PlayerPIT{
@@ -43,7 +43,7 @@ func newGetAndPersistPlayerWithCacheForHistory(err error) app.GetAndPersistPlaye
 	}
 }
 
-func TestBuildGetHistory(t *testing.T) {
+func TestBuildGetSessions(t *testing.T) {
 	t.Parallel()
 
 	now := time.Now()
@@ -84,25 +84,28 @@ func TestBuildGetHistory(t *testing.T) {
 			},
 		}
 
-		historyCases := []struct {
-			name    string
-			history []domain.PlayerPIT
+		sessionsCases := []struct {
+			name     string
+			sessions []domain.Session
 		}{
 			{
-				name:    "empty history",
-				history: []domain.PlayerPIT{},
+				name:     "empty sessions",
+				sessions: []domain.Session{},
 			},
 			{
-				name: "non-empty history",
-				history: []domain.PlayerPIT{
-					// NOTE: Stub players
+				name: "non-empty sessions",
+				sessions: []domain.Session{
 					{
-						UUID:       uuid,
-						Experience: 500,
-					},
-					{
-						UUID:       uuid,
-						Experience: 501,
+						// NOTE: Stub players
+						Start: domain.PlayerPIT{
+							UUID:       uuid,
+							Experience: 500,
+						},
+						End: domain.PlayerPIT{
+							UUID:       uuid,
+							Experience: 501,
+						},
+						Consecutive: true,
 					},
 				},
 			},
@@ -111,19 +114,19 @@ func TestBuildGetHistory(t *testing.T) {
 		for _, timeCase := range timeCases {
 			t.Run(timeCase.name, func(t *testing.T) {
 				t.Parallel()
-				for _, historyCase := range historyCases {
-					t.Run(historyCase.name, func(t *testing.T) {
+				for _, sessionsCase := range sessionsCases {
+					t.Run(sessionsCase.name, func(t *testing.T) {
 						t.Parallel()
 
-						getHistory := app.BuildGetHistory(
-							newMockHistoryRepository(t, historyCase.history, nil),
-							newGetAndPersistPlayerWithCacheForHistory(nil),
+						getSessions := app.BuildGetSessions(
+							newMockSessionsRepository(t, sessionsCase.sessions, nil),
+							newGetAndPersistPlayerWithCacheForSessions(nil),
 							nowFunc,
 						)
 
-						history, err := getHistory(context.Background(), uuid, timeCase.start, timeCase.end, 10)
+						sessions, err := getSessions(context.Background(), uuid, timeCase.start, timeCase.end)
 						require.NoError(t, err)
-						require.Equal(t, historyCase.history, history)
+						require.Equal(t, sessionsCase.sessions, sessions)
 					})
 				}
 			})
@@ -162,25 +165,28 @@ func TestBuildGetHistory(t *testing.T) {
 			},
 		}
 
-		historyCases := []struct {
-			name    string
-			history []domain.PlayerPIT
+		sessionsCases := []struct {
+			name     string
+			sessions []domain.Session
 		}{
 			{
-				name:    "empty history",
-				history: []domain.PlayerPIT{},
+				name:     "empty sessions",
+				sessions: []domain.Session{},
 			},
 			{
-				name: "non-empty history",
-				history: []domain.PlayerPIT{
-					// NOTE: Stub players
+				name: "non-empty sessions",
+				sessions: []domain.Session{
 					{
-						UUID:       uuid,
-						Experience: 500,
-					},
-					{
-						UUID:       uuid,
-						Experience: 501,
+						// NOTE: Stub players
+						Start: domain.PlayerPIT{
+							UUID:       uuid,
+							Experience: 500,
+						},
+						End: domain.PlayerPIT{
+							UUID:       uuid,
+							Experience: 501,
+						},
+						Consecutive: true,
 					},
 				},
 			},
@@ -189,8 +195,8 @@ func TestBuildGetHistory(t *testing.T) {
 		for _, timeCase := range timeCases {
 			t.Run(timeCase.name, func(t *testing.T) {
 				t.Parallel()
-				for _, historyCase := range historyCases {
-					t.Run(historyCase.name, func(t *testing.T) {
+				for _, sessionsCase := range sessionsCases {
+					t.Run(sessionsCase.name, func(t *testing.T) {
 						t.Parallel()
 
 						getAndPersistPlayerWithCache := func(ctx context.Context, uuid string) (*domain.PlayerPIT, error) {
@@ -199,15 +205,15 @@ func TestBuildGetHistory(t *testing.T) {
 							return nil, nil
 						}
 
-						getHistory := app.BuildGetHistory(
-							newMockHistoryRepository(t, historyCase.history, nil),
+						getSessions := app.BuildGetSessions(
+							newMockSessionsRepository(t, sessionsCase.sessions, nil),
 							getAndPersistPlayerWithCache,
 							nowFunc,
 						)
 
-						history, err := getHistory(context.Background(), uuid, timeCase.start, timeCase.end, 10)
+						sessions, err := getSessions(context.Background(), uuid, timeCase.start, timeCase.end)
 						require.NoError(t, err)
-						require.Equal(t, historyCase.history, history)
+						require.Equal(t, sessionsCase.sessions, sessions)
 					})
 				}
 			})
