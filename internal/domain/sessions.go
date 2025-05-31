@@ -5,3 +5,8 @@ type Session struct {
 	End         PlayerPIT
 	Consecutive bool
 }
+
+type SessionDetail struct {
+	Stats       []PlayerPIT
+	Consecutive bool
+}
