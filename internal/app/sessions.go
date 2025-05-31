@@ -52,3 +52,44 @@ func BuildGetSessions(
 		return sessions, nil
 	}
 }
+
+type GetSessionDetail = func(
+	ctx context.Context,
+	uuid string,
+	start, end time.Time,
+) ([]domain.Session, error)
+
+func BuildGetSessionDetail(
+	repo playerrepository.PlayerRepository,
+	updatePlayerInInterval UpdatePlayerInInterval,
+) GetSessionDetail {
+	return func(ctx context.Context,
+		uuid string,
+		start, end time.Time,
+	) ([]domain.Session, error) {
+		logger := logging.FromContext(ctx)
+
+		if !strutils.UUIDIsNormalized(uuid) {
+			err := fmt.Errorf("UUID is not normalized")
+			reporting.Report(ctx, err)
+			return nil, err
+		}
+
+		err := updatePlayerInInterval(ctx, uuid, start, end)
+		if err != nil {
+			// NOTE: UpdatePlayerInInterval implementations handle their own error reporting
+			logger.Error("Failed to update player data in interval", "error", err)
+
+			// NOTE: We continue even though we failed to update player data
+			// We may still be able to get the history and fulfill the request
+		}
+
+		sessions, err := repo.GetSessionDetail(ctx, uuid, start, end)
+		if err != nil {
+			// NOTE: PlayerRepository implementations handle their own error reporting
+			return nil, fmt.Errorf("failed to get sessions: %w", err)
+		}
+
+		return sessions, nil
+	}
+}
