@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/Amund211/flashlight/internal/adapters/cache"
 	"github.com/Amund211/flashlight/internal/adapters/playerrepository"
@@ -92,4 +93,74 @@ func TestGetAndPersistPlayer(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestUpdatePlayerInInterval(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name         string
+		start        time.Time
+		end          time.Time
+		now          time.Time
+		shouldUpdate bool
+	}{
+		{
+			name:         "current interval",
+			start:        time.Date(2024, time.March, 12, 0, 0, 0, 0, time.UTC),
+			end:          time.Date(2024, time.March, 26, 23, 59, 59, 999_999_999, time.UTC),
+			now:          time.Date(2024, time.March, 17, 12, 0, 0, 0, time.UTC),
+			shouldUpdate: true,
+		},
+		{
+			name:         "interval in the past",
+			start:        time.Date(2023, time.January, 1, 0, 0, 0, 0, time.UTC),
+			end:          time.Date(2023, time.January, 2, 0, 0, 0, 0, time.UTC),
+			now:          time.Date(2023, time.January, 3, 0, 0, 0, 0, time.UTC),
+			shouldUpdate: false,
+		},
+		{
+			name:         "interval in the future",
+			start:        time.Date(2023, time.January, 12, 0, 0, 0, 0, time.UTC),
+			end:          time.Date(2023, time.January, 13, 0, 0, 0, 0, time.UTC),
+			now:          time.Date(2023, time.January, 1, 0, 0, 0, 0, time.UTC),
+			shouldUpdate: false,
+		},
+		{
+			name:         "start=now",
+			start:        time.Date(2023, time.January, 1, 0, 0, 0, 0, time.UTC),
+			end:          time.Date(2023, time.January, 2, 0, 0, 0, 0, time.UTC),
+			now:          time.Date(2023, time.January, 1, 0, 0, 0, 0, time.UTC),
+			shouldUpdate: true,
+		},
+		{
+			name:  "end=now",
+			start: time.Date(2023, time.January, 1, 0, 0, 0, 0, time.UTC),
+			end:   time.Date(2023, time.January, 2, 0, 0, 0, 0, time.UTC),
+			now:   time.Date(2023, time.January, 2, 0, 0, 0, 0, time.UTC),
+			// NOTE: Not really any point in updating, as the time will be outside the interval by the time the new stats come in
+			shouldUpdate: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			testUUID := "01234567-9999-9999-0123-456789abcdef"
+
+			updated := false
+			getAndPersist := func(ctx context.Context, uuid string) (*domain.PlayerPIT, error) {
+				t.Helper()
+				require.Equal(t, testUUID, uuid)
+				updated = true
+				return nil, nil
+			}
+
+			updatePlayerInInterval := BuildUpdatePlayerInInterval(getAndPersist, func() time.Time { return tc.now })
+
+			err := updatePlayerInInterval(context.Background(), testUUID, tc.start, tc.end)
+			require.NoError(t, err)
+
+			require.Equal(t, tc.shouldUpdate, updated)
+		})
+	}
 }
