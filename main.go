@@ -18,6 +18,7 @@ import (
 	"github.com/Amund211/flashlight/internal/config"
 	"github.com/Amund211/flashlight/internal/domain"
 	"github.com/Amund211/flashlight/internal/ports"
+	"github.com/Amund211/flashlight/internal/ratelimiting"
 	"github.com/Amund211/flashlight/internal/reporting"
 	"github.com/google/uuid"
 )
@@ -57,7 +58,10 @@ func main() {
 
 	playerProvider := playerprovider.NewHypixelPlayerProvider(hypixelAPI)
 
-	accountProvider := accountprovider.NewMojang(httpClient, time.Now)
+	// TODO: Combined limiter
+	requestLimiter := ratelimiting.NewWindowLimitRequestLimiter(600, 10*time.Minute, time.Now, time.After)
+
+	accountProvider := accountprovider.NewMojang(httpClient, requestLimiter, time.Now)
 
 	sentryMiddleware, flush, err := reporting.NewSentryMiddlewareOrMock(config)
 	if err != nil {

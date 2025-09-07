@@ -12,32 +12,75 @@ import (
 
 	"github.com/Amund211/flashlight/internal/constants"
 	"github.com/Amund211/flashlight/internal/domain"
+	"github.com/Amund211/flashlight/internal/ratelimiting"
 	"github.com/Amund211/flashlight/internal/reporting"
 	"github.com/Amund211/flashlight/internal/strutils"
 )
+
+const getAccountMaxOperationTime = ratelimiting.MaxOperationTime(2 * time.Second)
 
 type HttpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
+type RequestLimiter interface {
+	Limit(ctx context.Context, maxOperationTime ratelimiting.MaxOperationTime, operation func()) error
+}
+
 type Mojang struct {
 	httpClient HttpClient
+	limiter    RequestLimiter
 	nowFunc    func() time.Time
 }
 
-func NewMojang(httpClient HttpClient, nowFunc func() time.Time) *Mojang {
+func NewMojang(httpClient HttpClient, limiter RequestLimiter, nowFunc func() time.Time) *Mojang {
 	return &Mojang{
 		httpClient: httpClient,
+		limiter:    limiter,
 		nowFunc:    nowFunc,
 	}
 }
 
 func (m *Mojang) GetAccountByUUID(ctx context.Context, uuid string) (domain.Account, error) {
-	return m.getProfile(ctx, fmt.Sprintf("https://api.minecraftservices.com/minecraft/profile/lookup/%s", uuid))
+	var account domain.Account
+	var err error
+	waitErr := m.limiter.Limit(ctx, getAccountMaxOperationTime, func() {
+		account, err = m.getProfile(ctx, fmt.Sprintf("https://api.minecraftservices.com/minecraft/profile/lookup/%s", uuid))
+	})
+	if errors.Is(waitErr, context.DeadlineExceeded) {
+		return domain.Account{}, fmt.Errorf("%w: too many requests to mojang API", domain.ErrTemporarilyUnavailable)
+	}
+	if waitErr != nil {
+		reporting.Report(ctx, waitErr)
+		return domain.Account{}, fmt.Errorf("failed to wait for rate limiter: %w", waitErr)
+	}
+
+	if err != nil {
+		return domain.Account{}, fmt.Errorf("failed to look up mojang profile by id: %w", err)
+	}
+
+	return account, nil
 }
 
 func (m *Mojang) GetAccountByUsername(ctx context.Context, username string) (domain.Account, error) {
-	return m.getProfile(ctx, fmt.Sprintf("https://api.minecraftservices.com/minecraft/profile/lookup/name/%s", username))
+	var account domain.Account
+	var err error
+	waitErr := m.limiter.Limit(ctx, getAccountMaxOperationTime, func() {
+		account, err = m.getProfile(ctx, fmt.Sprintf("https://api.minecraftservices.com/minecraft/profile/lookup/name/%s", username))
+	})
+	if errors.Is(waitErr, context.DeadlineExceeded) {
+		return domain.Account{}, fmt.Errorf("%w: too many requests to mojang API", domain.ErrTemporarilyUnavailable)
+	}
+	if waitErr != nil {
+		reporting.Report(ctx, waitErr)
+		return domain.Account{}, fmt.Errorf("failed to wait for rate limiter: %w", waitErr)
+	}
+
+	if err != nil {
+		return domain.Account{}, fmt.Errorf("failed to look up mojang profile by name: %w", err)
+	}
+
+	return account, nil
 }
 
 func (m *Mojang) getProfile(ctx context.Context, url string) (domain.Account, error) {
