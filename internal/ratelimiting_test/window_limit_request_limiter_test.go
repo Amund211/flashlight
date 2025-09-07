@@ -407,3 +407,35 @@ func TestWindowLimitRequestLimiter_NoContextDeadline(t *testing.T) {
 		t.Fatal("Operation should have completed")
 	}
 }
+
+func TestWindowLimitRequestLimiter_InterfaceCompliance(t *testing.T) {
+	// Verify that windowLimitRequestLimiter implements the RequestLimiter interface
+	// This is the interface used by the Mojang account provider
+	mockTime := NewMockTime(time.Now())
+	
+	var limiter interface{} = ratelimiting.NewWindowLimitRequestLimiter(
+		5,
+		1*time.Minute,
+		mockTime.Now,
+		mockTime.After,
+	)
+	
+	// This should compile - verify interface compliance
+	type RequestLimiter interface {
+		Limit(ctx context.Context, maxOperationTime ratelimiting.MaxOperationTime, operation func()) error
+	}
+	
+	_, ok := limiter.(RequestLimiter)
+	require.True(t, ok, "windowLimitRequestLimiter should implement RequestLimiter interface")
+	
+	// Test basic usage through interface
+	rl := limiter.(RequestLimiter)
+	ctx := context.Background()
+	operationCount := 0
+	
+	err := rl.Limit(ctx, ratelimiting.MaxOperationTime(1*time.Second), func() {
+		operationCount++
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, operationCount)
+}
