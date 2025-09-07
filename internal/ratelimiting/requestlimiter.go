@@ -31,6 +31,14 @@ func NewWindowLimitRequestLimiter(
 	for i := 0; i < limit; i++ {
 		availableSlots <- struct{}{}
 	}
+	
+	// Initialize madeRequests with old timestamps to allow immediate requests up to the limit
+	madeRequests := make([]time.Time, limit)
+	veryOldTime := nowFunc().Add(-window - time.Hour) // Ensure it's well outside the window
+	for i := 0; i < limit; i++ {
+		madeRequests[i] = veryOldTime
+	}
+	
 	return &windowLimitRequestLimiter{
 		limit:     limit,
 		window:    window,
@@ -38,6 +46,7 @@ func NewWindowLimitRequestLimiter(
 		afterFunc: afterFunc,
 
 		avaliableSlots: availableSlots,
+		madeRequests:   madeRequests,
 		mutex:          sync.Mutex{},
 	}
 }
