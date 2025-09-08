@@ -12,19 +12,18 @@ import (
 
 	"github.com/Amund211/flashlight/internal/constants"
 	"github.com/Amund211/flashlight/internal/domain"
-	"github.com/Amund211/flashlight/internal/ratelimiting"
 	"github.com/Amund211/flashlight/internal/reporting"
 	"github.com/Amund211/flashlight/internal/strutils"
 )
 
-const getAccountMaxOperationTime = ratelimiting.MaxOperationTime(2 * time.Second)
+const getAccountMaxOperationTime = 2 * time.Second
 
 type HttpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
 type RequestLimiter interface {
-	Limit(ctx context.Context, maxOperationTime ratelimiting.MaxOperationTime, operation func()) error
+	Limit(ctx context.Context, maxOperationTime time.Duration, operation func()) error
 }
 
 type Mojang struct {

@@ -7,18 +7,15 @@ import (
 	"time"
 )
 
-type MaxOperationTime time.Duration
-type MaxWait time.Duration
-
 type windowLimitRequestLimiter struct {
 	limit     int
 	window    time.Duration
 	nowFunc   func() time.Time
 	afterFunc func(time.Duration) <-chan time.Time
 
-	avaliableSlots chan struct{}
-	madeRequests   []time.Time
-	mutex          sync.Mutex
+	avaliableSlots   chan struct{}
+	finishedRequests []time.Time
+	mutex            sync.Mutex
 }
 
 func NewWindowLimitRequestLimiter(
@@ -31,19 +28,28 @@ func NewWindowLimitRequestLimiter(
 	for i := 0; i < limit; i++ {
 		availableSlots <- struct{}{}
 	}
+
+	// No finished requests within the window -> no waiting for the first requests
+	finishedRequests := make([]time.Time, limit)
+	veryOldTime := nowFunc().Add(-window)
+	for i := 0; i < limit; i++ {
+		finishedRequests[i] = veryOldTime
+	}
+
 	return &windowLimitRequestLimiter{
 		limit:     limit,
 		window:    window,
 		nowFunc:   nowFunc,
 		afterFunc: afterFunc,
 
-		avaliableSlots: availableSlots,
-		mutex:          sync.Mutex{},
+		avaliableSlots:   availableSlots,
+		finishedRequests: finishedRequests,
+		mutex:            sync.Mutex{},
 	}
 }
 
 // Return nil if if successfully waited
-func (l *windowLimitRequestLimiter) Limit(ctx context.Context, maxOperationTime MaxOperationTime, operation func()) error {
+func (l *windowLimitRequestLimiter) Limit(ctx context.Context, maxOperationTime time.Duration, operation func()) error {
 	return l.waitIf(ctx, func(ctx context.Context, wait time.Duration) bool {
 		deadline, ok := ctx.Deadline()
 		if !ok {
@@ -51,7 +57,7 @@ func (l *windowLimitRequestLimiter) Limit(ctx context.Context, maxOperationTime 
 			return true
 		}
 
-		maxDuration := wait + time.Duration(maxOperationTime)
+		maxDuration := wait + maxOperationTime
 		untilDeadline := deadline.Sub(l.nowFunc())
 		if maxDuration > untilDeadline {
 			return false
@@ -75,7 +81,7 @@ func (l *windowLimitRequestLimiter) waitIf(ctx context.Context, shouldRun func(c
 		l.mutex.Unlock()
 	}()
 
-	oldRequest := l.madeRequests[0]
+	oldRequest := l.finishedRequests[0]
 	wait := l.computeWait(oldRequest)
 	run := shouldRun(ctx, wait)
 	if !run {
@@ -96,14 +102,14 @@ func (l *windowLimitRequestLimiter) waitIf(ctx context.Context, shouldRun func(c
 
 	// Perform the operation
 	operation()
-	requestCompleted := l.nowFunc()
+	requestFinished := l.nowFunc()
 
-	// Insort completed request
+	// Insort finished request
 	l.mutex.Lock()
 	unlocked = false
 
-	l.madeRequests = append(l.madeRequests[1:], requestCompleted)
-	slices.SortFunc(l.madeRequests, func(a, b time.Time) int {
+	l.finishedRequests = append(l.finishedRequests[1:], requestFinished)
+	slices.SortFunc(l.finishedRequests, func(a, b time.Time) int {
 		if a.Before(b) {
 			return -1
 		}
