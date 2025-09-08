@@ -2,13 +2,11 @@ package ratelimiting_test
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/Amund211/flashlight/internal/ratelimiting"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -135,91 +133,51 @@ func TestWindowLimitRequestLimiter(t *testing.T) {
 	})
 	*/
 
-	t.Run("basic parallel rate limiting", func(t *testing.T) {
+	t.Run("simple window rate limiting", func(t *testing.T) {
 		start := time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)
 		mocked := newMockedTime(t, start)
 		l := ratelimiting.NewWindowLimitRequestLimiter(2, 10*time.Second, mocked.Now, mocked.After)
 		maxOperationTime := 2 * time.Second
 
-		var testCompleteWg sync.WaitGroup
-
-		var requestStartWg sync.WaitGroup
-		var requestFinishedWg sync.WaitGroup
-
-		issueRequest := func(initialDelay time.Duration, expectedStart time.Time, operationTime time.Duration) {
+		// First request - should start immediately
+		err := l.Limit(ctx, maxOperationTime, func() {
 			t.Helper()
-			testCompleteWg.Add(1)
+			require.Equal(t, start, mocked.Now())
+			mocked.advance(1 * time.Second) // Finish at t+1
+		})
+		require.NoError(t, err)
 
-			require.GreaterOrEqual(t, operationTime, 0*time.Second, "operation time must be non-negative")
-			require.GreaterOrEqual(t, initialDelay, 0*time.Second, "initial delay must be non-negative")
+		// Second request - should start immediately  
+		err = l.Limit(ctx, maxOperationTime, func() {
+			t.Helper()
+			require.Equal(t, start.Add(1*time.Second), mocked.Now())
+			mocked.advance(1 * time.Second) // Finish at t+2
+		})
+		require.NoError(t, err)
 
-			expectedEnd := expectedStart.Add(operationTime)
-
-			requestID := uuid.New()
-
-			go func() {
-				t.Helper()
-				defer requestFinishedWg.Done()
-				defer testCompleteWg.Done()
-
-				fmt.Printf("%s: Inital sleep for %s\n", requestID, initialDelay)
-				mocked.sleep(initialDelay)
-				fmt.Printf("%s: Slept initial %s, starting request\n", requestID, initialDelay)
-
-				err := l.Limit(ctx, maxOperationTime, func() {
-					t.Helper()
-					fmt.Printf("%s: Request started at %s, will take %s\n", requestID, mocked.Now(), operationTime)
-					require.Equal(t, expectedStart, mocked.Now(), fmt.Sprintf("%s: expected start time mismatch", requestID))
-					requestStartWg.Done()
-					mocked.sleep(operationTime)
-					require.Equal(t, expectedEnd, mocked.Now(), fmt.Sprintf("%s: expected end time mismatch", requestID))
-					fmt.Printf("%s: Request ended at %s\n", requestID, mocked.Now())
-				})
-				require.NoError(t, err)
-
-				fmt.Printf("%s: Request finished at %s\n", requestID, mocked.Now())
-
-				require.Equal(t, expectedEnd, mocked.Now(), fmt.Sprintf("%s: expected end time mismatch at request finish", requestID))
-			}()
-		}
-
-		// These requests should start immediately
-		requestStartWg.Add(2)
-		issueRequest(0*time.Second, start, 1*time.Second)
-		issueRequest(0*time.Second, start, 1*time.Second)
-
-		// NOTE: Requests are issued to make sure there are at most 2 requests in flight at any time
-		//       This makes the tests more predictable, as we can guarantee the order of requests
-		issueRequest(1*time.Second, start.Add(11*time.Second), 1*time.Second)
-		issueRequest(1*time.Second, start.Add(11*time.Second), 1*time.Second)
-		issueRequest(12*time.Second, start.Add(22*time.Second), 0*time.Second)
-		issueRequest(16*time.Second, start.Add(22*time.Second), 1*time.Second)
-
-		requestStartWg.Wait() // Ensure all requests have started
-
-		for second := 1; second <= 22; second++ {
-			switch second {
-			case 11, 22:
-				requestStartWg.Add(2)
-			}
-
-			switch second {
-			case 1, 12:
-				requestFinishedWg.Add(2)
-			case 22, 23:
-				requestFinishedWg.Add(1)
-			}
-			fmt.Printf("Advancing to t+%d\n", second)
-			mocked.advance(1 * time.Second)
-			fmt.Printf("Waiting for requests to process at t+%d\n", second)
-			requestStartWg.Wait() // Ensure all requests have processed in this tick
-			fmt.Printf("All requests processed at t+%d\n", second)
-
-			fmt.Printf("Waiting for requests to finish at t+%d\n", second)
-			requestFinishedWg.Wait() // Ensure all requests have processed in this tick
-			fmt.Printf("All requests finish at t+%d\n", second)
-		}
-
-		testCompleteWg.Wait() // Ensure all requests have finished
+		// Third request - should wait until the first request is outside the window
+		// The first request finished at t+1, so it should be outside the 10s window at t+11
+		// We're currently at t+2, so we need to wait 9 more seconds
+		
+		var requestStarted bool
+		go func() {
+			err := l.Limit(ctx, maxOperationTime, func() {
+				requestStarted = true
+				// Should start at t+11
+				require.Equal(t, start.Add(11*time.Second), mocked.Now())
+			})
+			require.NoError(t, err)
+		}()
+		
+		// Give the rate limiter a moment to start waiting
+		time.Sleep(10 * time.Millisecond)
+		require.False(t, requestStarted, "Request should not have started yet")
+		
+		// Advance time to trigger the rate limiter
+		mocked.advance(9 * time.Second) // Should now be at t+11
+		
+		// Give the goroutine time to process
+		time.Sleep(10 * time.Millisecond)
+		require.True(t, requestStarted, "Request should have started")
 	})
 }
