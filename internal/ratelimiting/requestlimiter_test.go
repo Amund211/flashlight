@@ -133,51 +133,57 @@ func TestWindowLimitRequestLimiter(t *testing.T) {
 	})
 	*/
 
-	t.Run("simple window rate limiting", func(t *testing.T) {
+	t.Run("comprehensive window rate limiting", func(t *testing.T) {
 		start := time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)
 		mocked := newMockedTime(t, start)
 		l := ratelimiting.NewWindowLimitRequestLimiter(2, 10*time.Second, mocked.Now, mocked.After)
 		maxOperationTime := 2 * time.Second
 
-		// First request - should start immediately
-		err := l.Limit(ctx, maxOperationTime, func() {
-			t.Helper()
-			require.Equal(t, start, mocked.Now())
-			mocked.advance(1 * time.Second) // Finish at t+1
-		})
-		require.NoError(t, err)
+		// Track request timing
+		var requestTimes []time.Time
 
-		// Second request - should start immediately  
-		err = l.Limit(ctx, maxOperationTime, func() {
-			t.Helper()
-			require.Equal(t, start.Add(1*time.Second), mocked.Now())
-			mocked.advance(1 * time.Second) // Finish at t+2
-		})
-		require.NoError(t, err)
-
-		// Third request - should wait until the first request is outside the window
-		// The first request finished at t+1, so it should be outside the 10s window at t+11
-		// We're currently at t+2, so we need to wait 9 more seconds
-		
-		var requestStarted bool
-		go func() {
+		// Helper to issue a request and record when it starts
+		issueRequest := func(shouldStart time.Time) {
 			err := l.Limit(ctx, maxOperationTime, func() {
-				requestStarted = true
-				// Should start at t+11
-				require.Equal(t, start.Add(11*time.Second), mocked.Now())
+				t.Helper()
+				requestTimes = append(requestTimes, mocked.Now())
+				require.Equal(t, shouldStart, mocked.Now())
+				mocked.advance(1 * time.Second) // Each request takes 1 second
 			})
 			require.NoError(t, err)
+		}
+
+		// First two requests should start immediately (at t+0)
+		issueRequest(start)                     // Request 1: starts at t+0, finishes at t+1
+		issueRequest(start.Add(1 * time.Second)) // Request 2: starts at t+1, finishes at t+2
+
+		// Third request should wait until first request is outside 10s window
+		// First request finished at t+1, so it's outside window at t+11
+		// We're at t+2, so need to advance time to t+11
+		var thirdStarted bool
+		go func() {
+			issueRequest(start.Add(11 * time.Second)) // Request 3: should start at t+11
+			thirdStarted = true
 		}()
+
+		// Advance time gradually to t+11
+		time.Sleep(10 * time.Millisecond) // Let goroutine start
+		require.False(t, thirdStarted, "Third request should not start yet")
 		
-		// Give the rate limiter a moment to start waiting
-		time.Sleep(10 * time.Millisecond)
-		require.False(t, requestStarted, "Request should not have started yet")
-		
-		// Advance time to trigger the rate limiter
-		mocked.advance(9 * time.Second) // Should now be at t+11
-		
-		// Give the goroutine time to process
-		time.Sleep(10 * time.Millisecond)
-		require.True(t, requestStarted, "Request should have started")
+		mocked.advance(9 * time.Second) // Now at t+11
+		time.Sleep(10 * time.Millisecond) // Let goroutine complete
+		require.True(t, thirdStarted, "Third request should have started")
+
+		// Fourth request should wait until second request is outside window  
+		// Second request finished at t+2, so it's outside window at t+12
+		// We're at t+12, so it should start immediately
+		issueRequest(start.Add(12 * time.Second)) // Request 4: starts at t+12
+
+		// Verify the timing sequence
+		require.Len(t, requestTimes, 4)
+		require.Equal(t, start, requestTimes[0])                     // t+0
+		require.Equal(t, start.Add(1*time.Second), requestTimes[1])  // t+1  
+		require.Equal(t, start.Add(11*time.Second), requestTimes[2]) // t+11
+		require.Equal(t, start.Add(12*time.Second), requestTimes[3]) // t+12
 	})
 }
