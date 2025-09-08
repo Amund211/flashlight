@@ -13,7 +13,7 @@ type windowLimitRequestLimiter struct {
 	nowFunc   func() time.Time
 	afterFunc func(time.Duration) <-chan time.Time
 
-	avaliableSlots   chan struct{}
+	availableSlots   chan struct{}
 	finishedRequests []time.Time
 	mutex            sync.Mutex
 }
@@ -42,7 +42,7 @@ func NewWindowLimitRequestLimiter(
 		nowFunc:   nowFunc,
 		afterFunc: afterFunc,
 
-		avaliableSlots:   availableSlots,
+		availableSlots:   availableSlots,
 		finishedRequests: finishedRequests,
 		mutex:            sync.Mutex{},
 	}
@@ -129,9 +129,9 @@ func (l *windowLimitRequestLimiter) computeWait(oldRequest time.Time) time.Durat
 }
 
 func (l *windowLimitRequestLimiter) grabSlot() {
-	<-l.avaliableSlots
+	<-l.availableSlots
 }
 
 func (l *windowLimitRequestLimiter) refillSlot() {
-	l.avaliableSlots <- struct{}{}
+	l.availableSlots <- struct{}{}
 }

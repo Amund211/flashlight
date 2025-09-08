@@ -1,6 +1,7 @@
 package ratelimiting_test
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"testing"
@@ -80,16 +81,11 @@ func (m *mockedTime) sleep(d time.Duration) {
 		return
 	}
 
-	select {
-	case <-m.After(d):
-		return
-	case <-m.t.Context().Done():
-		require.False(m.t, true, "sleep interrupted")
-	}
+	<-m.After(d)
 }
 
 func TestWindowLimitRequestLimiter(t *testing.T) {
-	ctx := t.Context()
+	ctx := context.Background()
 
 	t.Run("init", func(t *testing.T) {
 		l := ratelimiting.NewWindowLimitRequestLimiter(5, 10, time.Now, time.After)
@@ -97,46 +93,46 @@ func TestWindowLimitRequestLimiter(t *testing.T) {
 	})
 
 	/*
-		t.Run("basic serial rate limiting", func(t *testing.T) {
-			start := time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)
-			mocked := newMockedTime(t, start)
-			l := ratelimiting.NewWindowLimitRequestLimiter(2, 10*time.Second, mocked.Now, mocked.After)
-			maxOperationTime := 2 * time.Second
+	t.Run("basic serial rate limiting", func(t *testing.T) {
+		start := time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)
+		mocked := newMockedTime(t, start)
+		l := ratelimiting.NewWindowLimitRequestLimiter(2, 10*time.Second, mocked.Now, mocked.After)
+		maxOperationTime := 2 * time.Second
 
-			err := l.Limit(ctx, maxOperationTime, func() {
-				t.Helper()
-				require.Equal(t, mocked.Now(), start)
-				mocked.advance(1 * time.Second)
-				require.Equal(t, mocked.Now(), start.Add(1*time.Second))
-			})
-			require.NoError(t, err)
+		err := l.Limit(ctx, maxOperationTime, func() {
+			t.Helper()
+			require.Equal(t, mocked.Now(), start)
+			mocked.advance(1 * time.Second)
 			require.Equal(t, mocked.Now(), start.Add(1*time.Second))
+		})
+		require.NoError(t, err)
+		require.Equal(t, mocked.Now(), start.Add(1*time.Second))
 
-			err = l.Limit(ctx, maxOperationTime, func() {
-				t.Helper()
-				require.Equal(t, mocked.Now(), start.Add(1*time.Second))
-				mocked.advance(1 * time.Second)
-				require.Equal(t, mocked.Now(), start.Add(2*time.Second))
-			})
-			require.NoError(t, err)
+		err = l.Limit(ctx, maxOperationTime, func() {
+			t.Helper()
+			require.Equal(t, mocked.Now(), start.Add(1*time.Second))
+			mocked.advance(1 * time.Second)
 			require.Equal(t, mocked.Now(), start.Add(2*time.Second))
+		})
+		require.NoError(t, err)
+		require.Equal(t, mocked.Now(), start.Add(2*time.Second))
 
-			// Third request should not start until the first finished request is outside the window
-			err = l.Limit(ctx, maxOperationTime, func() {
-				t.Helper()
-				require.Equal(t, mocked.Now(), start.Add(11*time.Second))
-			})
-			require.NoError(t, err)
+		// Third request should not start until the first finished request is outside the window
+		err = l.Limit(ctx, maxOperationTime, func() {
+			t.Helper()
 			require.Equal(t, mocked.Now(), start.Add(11*time.Second))
+		})
+		require.NoError(t, err)
+		require.Equal(t, mocked.Now(), start.Add(11*time.Second))
 
-			// Fourth request should not start until the second finished request is outside the window
-			err = l.Limit(ctx, maxOperationTime, func() {
-				t.Helper()
-				require.Equal(t, mocked.Now(), start.Add(12*time.Second))
-			})
-			require.NoError(t, err)
+		// Fourth request should not start until the second finished request is outside the window
+		err = l.Limit(ctx, maxOperationTime, func() {
+			t.Helper()
 			require.Equal(t, mocked.Now(), start.Add(12*time.Second))
 		})
+		require.NoError(t, err)
+		require.Equal(t, mocked.Now(), start.Add(12*time.Second))
+	})
 	*/
 
 	t.Run("basic parallel rate limiting", func(t *testing.T) {
