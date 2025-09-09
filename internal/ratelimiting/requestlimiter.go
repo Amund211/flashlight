@@ -2,7 +2,6 @@ package ratelimiting
 
 import (
 	"context"
-	"fmt"
 	"slices"
 	"sync"
 	"time"
@@ -82,8 +81,6 @@ func (l *windowLimitRequestLimiter) waitIf(ctx context.Context, shouldRun func(c
 		l.mutex.Unlock()
 	}()
 
-	fmt.Println("Finished requests at entry:", l.finishedRequests)
-
 	oldRequest := l.finishedRequests[0]
 	wait := l.computeWait(oldRequest)
 	run := shouldRun(ctx, wait)
@@ -124,7 +121,6 @@ func (l *windowLimitRequestLimiter) waitIf(ctx context.Context, shouldRun func(c
 		}
 		return 0
 	})
-	fmt.Println("Finished requests at exit:", l.finishedRequests)
 
 	return nil
 }

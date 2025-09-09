@@ -1,7 +1,6 @@
 package ratelimiting_test
 
 import (
-	"fmt"
 	"runtime"
 	"slices"
 	"sync"
@@ -134,7 +133,6 @@ func TestWindowLimitRequestLimiter(t *testing.T) {
 
 				err := l.Limit(ctx, maxOperationTime, func() {
 					t.Helper()
-					fmt.Println("Request started at", mocked.Now(), "expected", expectedStart)
 					require.Equal(t, expectedStart, mocked.Now())
 					mocked.sleep(operationTime)
 					require.Equal(t, expectedEnd, mocked.Now())
@@ -175,42 +173,11 @@ func TestWindowLimitRequestLimiter(t *testing.T) {
 		}
 
 		for second := 0; second < 23; second++ {
-			fmt.Println("At second", second, "after calls:", mocked.afterCalls.Load(), "desired:", desiredAfterCalls(second))
 			for mocked.afterCalls.Load() != desiredAfterCalls(second) {
-				fmt.Println("  Waiting for after calls to be registered", mocked.afterCalls.Load(), "of", desiredAfterCalls(second), second)
 				runtime.Gosched() // Allow other goroutines to run
 			}
-			fmt.Println("  All after calls registered")
 
-			/*
-				// Requests starting at this second
-				switch second {
-				case 11, 22:
-					requestStartWg.Add(2)
-				}
-
-				// Requests finishing at this second
-				switch second {
-				case 1, 12:
-					requestFinishedWg.Add(2)
-				case 22, 23:
-					requestFinishedWg.Add(1)
-				}
-			*/
-
-			fmt.Println("Advancing to second", second+1)
 			mocked.advance(1 * time.Second)
-
-			/*
-				// Ensure all requests that should have started/finished in this tick have done so
-				fmt.Println("  Waiting for requests to finish")
-				requestFinishedWg.Wait()
-				fmt.Println("  All requests finished")
-
-				fmt.Println("  Waiting for requests to start")
-				requestStartWg.Wait()
-				fmt.Println("  All requests started")
-			*/
 		}
 
 		testCompleteWg.Wait() // Ensure all requests have finished
