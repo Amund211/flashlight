@@ -140,6 +140,9 @@ func TestWindowLimitRequestLimiter(t *testing.T) {
 				require.NoError(t, err)
 
 				require.Equal(t, expectedEnd, mocked.Now())
+
+				// HACK: Add an extra "call" so we can wait for the request to complete
+				mocked.afterCalls.Add(1)
 			}()
 		}
 
@@ -149,7 +152,7 @@ func TestWindowLimitRequestLimiter(t *testing.T) {
 		issueRequest(0*time.Second, start, 1*time.Second)
 		issueRequest(1*time.Second, start.Add(11*time.Second), 1*time.Second)
 		issueRequest(1*time.Second, start.Add(11*time.Second), 1*time.Second)
-		issueRequest(2*time.Second, start.Add(22*time.Second), 1*time.Second)
+		issueRequest(2*time.Second, start.Add(22*time.Second), 0*time.Second)
 		issueRequest(2*time.Second, start.Add(22*time.Second), 1*time.Second)
 
 		desiredAfterCalls := func(currentSecond int) int32 {
@@ -161,12 +164,17 @@ func TestWindowLimitRequestLimiter(t *testing.T) {
 					desiredCalls += 2 // sleeps in requests
 				case 1:
 					desiredCalls += 2 // call to Limit fetches slots + waits
+					desiredCalls += 2 // finishes
 				case 11:
 					desiredCalls += 2 // sleeps in requests
 				case 12:
 					desiredCalls += 2 // call to Limit fetches slot + waits
+					desiredCalls += 2 // finishes
 				case 22:
-					desiredCalls += 2 // sleep in request
+					desiredCalls += 1 // sleep in request
+					desiredCalls += 1 // finishes
+				case 23:
+					desiredCalls += 1 // finishes
 				}
 			}
 			return desiredCalls
