@@ -79,24 +79,14 @@ func (m *mockedTime) advance(d time.Duration) {
 	m.timers = remainingTimers
 }
 
-func (m *mockedTime) sleep(d time.Duration, onRegisteredFuncs ...func()) {
+func (m *mockedTime) sleep(d time.Duration) {
 	m.t.Helper()
-	onRegistered := func() {
-		for _, f := range onRegisteredFuncs {
-			f()
-		}
-	}
 	if d <= 0 {
-		onRegistered()
 		return
 	}
 
-	afterTimer := m.After(d)
-
-	onRegistered()
-
 	select {
-	case <-afterTimer:
+	case <-m.After(d):
 		return
 	case <-m.t.Context().Done():
 		require.False(m.t, true, "sleep interrupted")
