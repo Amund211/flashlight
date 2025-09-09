@@ -109,9 +109,6 @@ func TestWindowLimitRequestLimiter(t *testing.T) {
 			t.Helper()
 			testCompleteWg.Add(1)
 
-			require.GreaterOrEqual(t, operationTime, 0*time.Second, "operation time must be non-negative")
-			require.GreaterOrEqual(t, initialDelay, 0*time.Second, "initial delay must be non-negative")
-
 			expectedEnd := expectedStart.Add(operationTime)
 
 			go func() {
