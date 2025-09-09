@@ -88,6 +88,9 @@ func (l *windowLimitRequestLimiter) waitIf(ctx context.Context, shouldRun func(c
 		return context.DeadlineExceeded
 	}
 
+	// Remove the oldest request
+	l.finishedRequests = l.finishedRequests[1:]
+
 	l.mutex.Unlock()
 	unlocked = true
 
@@ -108,7 +111,7 @@ func (l *windowLimitRequestLimiter) waitIf(ctx context.Context, shouldRun func(c
 	l.mutex.Lock()
 	unlocked = false
 
-	l.finishedRequests = append(l.finishedRequests[1:], requestFinished)
+	l.finishedRequests = append(l.finishedRequests, requestFinished)
 	slices.SortFunc(l.finishedRequests, func(a, b time.Time) int {
 		if a.Before(b) {
 			return -1

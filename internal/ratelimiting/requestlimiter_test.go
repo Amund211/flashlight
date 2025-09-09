@@ -1,13 +1,11 @@
 package ratelimiting_test
 
 import (
-	"fmt"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/Amund211/flashlight/internal/ratelimiting"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -96,49 +94,6 @@ func TestWindowLimitRequestLimiter(t *testing.T) {
 		require.NotNil(t, l)
 	})
 
-	/*
-		t.Run("basic serial rate limiting", func(t *testing.T) {
-			start := time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)
-			mocked := newMockedTime(t, start)
-			l := ratelimiting.NewWindowLimitRequestLimiter(2, 10*time.Second, mocked.Now, mocked.After)
-			maxOperationTime := 2 * time.Second
-
-			err := l.Limit(ctx, maxOperationTime, func() {
-				t.Helper()
-				require.Equal(t, mocked.Now(), start)
-				mocked.advance(1 * time.Second)
-				require.Equal(t, mocked.Now(), start.Add(1*time.Second))
-			})
-			require.NoError(t, err)
-			require.Equal(t, mocked.Now(), start.Add(1*time.Second))
-
-			err = l.Limit(ctx, maxOperationTime, func() {
-				t.Helper()
-				require.Equal(t, mocked.Now(), start.Add(1*time.Second))
-				mocked.advance(1 * time.Second)
-				require.Equal(t, mocked.Now(), start.Add(2*time.Second))
-			})
-			require.NoError(t, err)
-			require.Equal(t, mocked.Now(), start.Add(2*time.Second))
-
-			// Third request should not start until the first finished request is outside the window
-			err = l.Limit(ctx, maxOperationTime, func() {
-				t.Helper()
-				require.Equal(t, mocked.Now(), start.Add(11*time.Second))
-			})
-			require.NoError(t, err)
-			require.Equal(t, mocked.Now(), start.Add(11*time.Second))
-
-			// Fourth request should not start until the second finished request is outside the window
-			err = l.Limit(ctx, maxOperationTime, func() {
-				t.Helper()
-				require.Equal(t, mocked.Now(), start.Add(12*time.Second))
-			})
-			require.NoError(t, err)
-			require.Equal(t, mocked.Now(), start.Add(12*time.Second))
-		})
-	*/
-
 	t.Run("basic parallel rate limiting", func(t *testing.T) {
 		start := time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)
 		mocked := newMockedTime(t, start)
@@ -159,31 +114,23 @@ func TestWindowLimitRequestLimiter(t *testing.T) {
 
 			expectedEnd := expectedStart.Add(operationTime)
 
-			requestID := uuid.New()
-
 			go func() {
 				t.Helper()
 				defer requestFinishedWg.Done()
 				defer testCompleteWg.Done()
 
-				fmt.Printf("%s: Inital sleep for %s\n", requestID, initialDelay)
 				mocked.sleep(initialDelay)
-				fmt.Printf("%s: Slept initial %s, starting request\n", requestID, initialDelay)
 
 				err := l.Limit(ctx, maxOperationTime, func() {
 					t.Helper()
-					fmt.Printf("%s: Request started at %s, will take %s\n", requestID, mocked.Now(), operationTime)
-					require.Equal(t, expectedStart, mocked.Now(), fmt.Sprintf("%s: expected start time mismatch", requestID))
+					require.Equal(t, expectedStart, mocked.Now())
 					requestStartWg.Done()
 					mocked.sleep(operationTime)
-					require.Equal(t, expectedEnd, mocked.Now(), fmt.Sprintf("%s: expected end time mismatch", requestID))
-					fmt.Printf("%s: Request ended at %s\n", requestID, mocked.Now())
+					require.Equal(t, expectedEnd, mocked.Now())
 				})
 				require.NoError(t, err)
 
-				fmt.Printf("%s: Request finished at %s\n", requestID, mocked.Now())
-
-				require.Equal(t, expectedEnd, mocked.Now(), fmt.Sprintf("%s: expected end time mismatch at request finish", requestID))
+				require.Equal(t, expectedEnd, mocked.Now())
 			}()
 		}
 
@@ -201,27 +148,26 @@ func TestWindowLimitRequestLimiter(t *testing.T) {
 
 		requestStartWg.Wait() // Ensure all requests have started
 
-		for second := 1; second <= 22; second++ {
+		for second := 1; second <= 23; second++ {
+			// Requests starting at this second
 			switch second {
 			case 11, 22:
 				requestStartWg.Add(2)
 			}
 
+			// Requests finishing at this second
 			switch second {
 			case 1, 12:
 				requestFinishedWg.Add(2)
 			case 22, 23:
 				requestFinishedWg.Add(1)
 			}
-			fmt.Printf("Advancing to t+%d\n", second)
-			mocked.advance(1 * time.Second)
-			fmt.Printf("Waiting for requests to process at t+%d\n", second)
-			requestStartWg.Wait() // Ensure all requests have processed in this tick
-			fmt.Printf("All requests processed at t+%d\n", second)
 
-			fmt.Printf("Waiting for requests to finish at t+%d\n", second)
-			requestFinishedWg.Wait() // Ensure all requests have processed in this tick
-			fmt.Printf("All requests finish at t+%d\n", second)
+			mocked.advance(1 * time.Second)
+
+			// Ensure all requests that should have started/finished in this tick have done so
+			requestStartWg.Wait()
+			requestFinishedWg.Wait()
 		}
 
 		testCompleteWg.Wait() // Ensure all requests have finished
