@@ -1,7 +1,11 @@
 package ratelimiting_test
 
 import (
+	"fmt"
+	"runtime"
+	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -14,6 +18,7 @@ type mockedTime struct {
 	currentTime time.Time
 	timers      []mockedTimer
 	lock        sync.Mutex
+	afterCalls  atomic.Int32
 }
 
 type mockedTimer struct {
@@ -27,6 +32,7 @@ func newMockedTime(t *testing.T, start time.Time) *mockedTime {
 		currentTime: start,
 		timers:      []mockedTimer{},
 		lock:        sync.Mutex{},
+		afterCalls:  atomic.Int32{},
 	}
 }
 
@@ -47,6 +53,8 @@ func (m *mockedTime) After(d time.Duration) <-chan time.Time {
 		ch:        ch,
 		expiresAt: m.currentTime.Add(d),
 	})
+
+	m.afterCalls.Add(1)
 
 	return ch
 }
@@ -72,14 +80,24 @@ func (m *mockedTime) advance(d time.Duration) {
 	m.timers = remainingTimers
 }
 
-func (m *mockedTime) sleep(d time.Duration) {
+func (m *mockedTime) sleep(d time.Duration, onRegisteredFuncs ...func()) {
 	m.t.Helper()
+	onRegistered := func() {
+		for _, f := range onRegisteredFuncs {
+			f()
+		}
+	}
 	if d <= 0 {
+		onRegistered()
 		return
 	}
 
+	afterTimer := m.After(d)
+
+	onRegistered()
+
 	select {
-	case <-m.After(d):
+	case <-afterTimer:
 		return
 	case <-m.t.Context().Done():
 		require.False(m.t, true, "sleep interrupted")
@@ -102,9 +120,6 @@ func TestWindowLimitRequestLimiter(t *testing.T) {
 
 		var testCompleteWg sync.WaitGroup
 
-		var requestStartWg sync.WaitGroup
-		var requestFinishedWg sync.WaitGroup
-
 		issueRequest := func(initialDelay time.Duration, expectedStart time.Time, operationTime time.Duration) {
 			t.Helper()
 			testCompleteWg.Add(1)
@@ -113,15 +128,14 @@ func TestWindowLimitRequestLimiter(t *testing.T) {
 
 			go func() {
 				t.Helper()
-				defer requestFinishedWg.Done()
 				defer testCompleteWg.Done()
 
 				mocked.sleep(initialDelay)
 
 				err := l.Limit(ctx, maxOperationTime, func() {
 					t.Helper()
+					fmt.Println("Request started at", mocked.Now(), "expected", expectedStart)
 					require.Equal(t, expectedStart, mocked.Now())
-					requestStartWg.Done()
 					mocked.sleep(operationTime)
 					require.Equal(t, expectedEnd, mocked.Now())
 				})
@@ -131,42 +145,136 @@ func TestWindowLimitRequestLimiter(t *testing.T) {
 			}()
 		}
 
-		// These requests should start immediately
-		requestStartWg.Add(2)
-		issueRequest(0*time.Second, start, 1*time.Second)
-		issueRequest(0*time.Second, start, 1*time.Second)
-
-		// NOTE: Requests are issued to make sure there are at most 2 requests in flight at any time
+		// NOTE: Requests are issued to make sure there are at most 2 requests waiting at any time
 		//       This makes the tests more predictable, as we can guarantee the order of requests
+		issueRequest(0*time.Second, start, 1*time.Second)
+		issueRequest(0*time.Second, start, 1*time.Second)
 		issueRequest(1*time.Second, start.Add(11*time.Second), 1*time.Second)
 		issueRequest(1*time.Second, start.Add(11*time.Second), 1*time.Second)
-		issueRequest(12*time.Second, start.Add(22*time.Second), 0*time.Second)
-		issueRequest(16*time.Second, start.Add(22*time.Second), 1*time.Second)
+		issueRequest(2*time.Second, start.Add(22*time.Second), 1*time.Second)
+		issueRequest(2*time.Second, start.Add(22*time.Second), 1*time.Second)
 
-		requestStartWg.Wait() // Ensure all requests have started
-
-		for second := 1; second <= 23; second++ {
-			// Requests starting at this second
-			switch second {
-			case 11, 22:
-				requestStartWg.Add(2)
+		desiredAfterCalls := func(currentSecond int) int32 {
+			desiredCalls := int32(0)
+			for second := 0; second <= currentSecond; second++ {
+				switch second {
+				case 0:
+					desiredCalls += 4 // Initial sleeps
+					desiredCalls += 2 // sleeps in requests
+				case 1:
+					desiredCalls += 2 // call to Limit fetches slots + waits
+				case 11:
+					desiredCalls += 2 // sleeps in requests
+				case 12:
+					desiredCalls += 2 // call to Limit fetches slot + waits
+				case 22:
+					desiredCalls += 2 // sleep in request
+				}
 			}
+			return desiredCalls
+		}
 
-			// Requests finishing at this second
-			switch second {
-			case 1, 12:
-				requestFinishedWg.Add(2)
-			case 22, 23:
-				requestFinishedWg.Add(1)
+		for second := 0; second < 23; second++ {
+			fmt.Println("At second", second, "after calls:", mocked.afterCalls.Load(), "desired:", desiredAfterCalls(second))
+			for mocked.afterCalls.Load() != desiredAfterCalls(second) {
+				fmt.Println("  Waiting for after calls to be registered", mocked.afterCalls.Load(), "of", desiredAfterCalls(second), second)
+				runtime.Gosched() // Allow other goroutines to run
 			}
+			fmt.Println("  All after calls registered")
 
+			/*
+				// Requests starting at this second
+				switch second {
+				case 11, 22:
+					requestStartWg.Add(2)
+				}
+
+				// Requests finishing at this second
+				switch second {
+				case 1, 12:
+					requestFinishedWg.Add(2)
+				case 22, 23:
+					requestFinishedWg.Add(1)
+				}
+			*/
+
+			fmt.Println("Advancing to second", second+1)
 			mocked.advance(1 * time.Second)
 
-			// Ensure all requests that should have started/finished in this tick have done so
-			requestStartWg.Wait()
-			requestFinishedWg.Wait()
+			/*
+				// Ensure all requests that should have started/finished in this tick have done so
+				fmt.Println("  Waiting for requests to finish")
+				requestFinishedWg.Wait()
+				fmt.Println("  All requests finished")
+
+				fmt.Println("  Waiting for requests to start")
+				requestStartWg.Wait()
+				fmt.Println("  All requests started")
+			*/
 		}
 
 		testCompleteWg.Wait() // Ensure all requests have finished
+	})
+
+	t.Run("concurrent requests > limit", func(t *testing.T) {
+		start := time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)
+		mocked := newMockedTime(t, start)
+		l := ratelimiting.NewWindowLimitRequestLimiter(2, 10*time.Second, mocked.Now, mocked.After)
+		maxOperationTime := 2 * time.Second
+		operationTime := 1 * time.Second
+
+		requests := 100
+		mutex := sync.Mutex{}
+		startedAt := make([]time.Time, 0)
+		completedRequests := atomic.Int32{}
+
+		issueRequest := func() {
+			t.Helper()
+
+			go func() {
+				t.Helper()
+				defer completedRequests.Add(1)
+
+				err := l.Limit(ctx, maxOperationTime, func() {
+					t.Helper()
+
+					mutex.Lock()
+					startedAt = append(startedAt, mocked.Now())
+					mutex.Unlock()
+
+					mocked.sleep(operationTime)
+				})
+				require.NoError(t, err)
+			}()
+		}
+
+		// These requests should start immediately
+		for i := 0; i < requests; i++ {
+			issueRequest()
+		}
+
+		for completedRequests.Load() < int32(requests) {
+			mocked.advance(1 * time.Second)
+			for i := 0; i < requests; i++ {
+				runtime.Gosched() // Allow other goroutines to run
+			}
+		}
+
+		slices.SortFunc(startedAt, func(a, b time.Time) int {
+			if a.Before(b) {
+				return -1
+			} else if a.After(b) {
+				return 1
+			}
+			return 0
+		})
+
+		require.Len(t, startedAt, requests)
+		for i := 0; i < requests; i++ {
+			batch := i / 2
+			waitPerBatch := 10*time.Second + 1*time.Second
+			earliestStart := start.Add(time.Duration(batch) * waitPerBatch)
+			require.GreaterOrEqual(t, startedAt[i], earliestStart)
+		}
 	})
 }
