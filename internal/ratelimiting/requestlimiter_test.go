@@ -242,4 +242,15 @@ func TestWindowLimitRequestLimiter(t *testing.T) {
 			require.GreaterOrEqual(t, startedAt[i], earliestStart)
 		}
 	})
+
+	// TODO: Tests for context cancellation and timeouts
+
+	// Following code fixes and related tests:
+	// - lock after auqire slot
+	//
+	// - select when aquiringf - exit on ctx cancelled
+	//
+	// - deadline on actual request = max
+	//
+	// - max waiters?
 }
