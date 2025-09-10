@@ -1,6 +1,7 @@
 package ratelimiting_test
 
 import (
+	"context"
 	"runtime"
 	"slices"
 	"sync"
@@ -94,7 +95,7 @@ func (m *mockedTime) sleep(d time.Duration) {
 }
 
 func TestWindowLimitRequestLimiter(t *testing.T) {
-	ctx := t.Context()
+	ctx := context.Background()
 
 	t.Run("init", func(t *testing.T) {
 		l := ratelimiting.NewWindowLimitRequestLimiter(5, 10, time.Now, time.After)
