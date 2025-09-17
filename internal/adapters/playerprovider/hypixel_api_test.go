@@ -58,6 +58,12 @@ func newMockedHttpClient(t *testing.T, expectedURL string, statusCode int, body 
 }
 
 func TestGetPlayerData(t *testing.T) {
+	now := time.Now()
+
+	nowFunc := func() time.Time {
+		return now
+	}
+
 	t.Run("success", func(t *testing.T) {
 		httpClient := newMockedHttpClient(
 			t,
@@ -66,16 +72,14 @@ func TestGetPlayerData(t *testing.T) {
 			`{"success":true,"player":null}`,
 			nil,
 		)
-		hypixelAPI := NewHypixelAPI(httpClient, apiKey)
-
-		expectedQueriedAt := time.Now()
+		hypixelAPI := NewHypixelAPI(httpClient, nowFunc, time.After, apiKey)
 
 		data, statusCode, queriedAt, err := hypixelAPI.GetPlayerData(context.Background(), "uuid1234")
 
 		require.Nil(t, err)
 		require.Equal(t, 200, statusCode)
 		require.Equal(t, `{"success":true,"player":null}`, string(data))
-		require.WithinDuration(t, expectedQueriedAt, queriedAt, time.Second)
+		require.Equal(t, now, queriedAt)
 	})
 
 	t.Run("request error", func(t *testing.T) {
@@ -86,7 +90,7 @@ func TestGetPlayerData(t *testing.T) {
 			`{"success":true,"player":null}`,
 			assert.AnError,
 		)
-		hypixelAPI := NewHypixelAPI(httpClient, apiKey)
+		hypixelAPI := NewHypixelAPI(httpClient, nowFunc, time.After, apiKey)
 
 		_, _, _, err := hypixelAPI.GetPlayerData(context.Background(), "uuid123456")
 		require.ErrorIs(t, err, assert.AnError)
@@ -102,7 +106,7 @@ func TestGetPlayerData(t *testing.T) {
 			},
 			requestErr: nil,
 		}
-		hypixelAPI := NewHypixelAPI(httpClient, apiKey)
+		hypixelAPI := NewHypixelAPI(httpClient, nowFunc, time.After, apiKey)
 
 		_, _, _, err := hypixelAPI.GetPlayerData(context.Background(), "uuid")
 		require.ErrorIs(t, err, assert.AnError)
