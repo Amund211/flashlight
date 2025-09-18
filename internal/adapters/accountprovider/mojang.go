@@ -12,6 +12,7 @@ import (
 
 	"github.com/Amund211/flashlight/internal/constants"
 	"github.com/Amund211/flashlight/internal/domain"
+	"github.com/Amund211/flashlight/internal/logging"
 	"github.com/Amund211/flashlight/internal/ratelimiting"
 	"github.com/Amund211/flashlight/internal/reporting"
 	"github.com/Amund211/flashlight/internal/strutils"
@@ -72,6 +73,7 @@ func (m *Mojang) getProfile(ctx context.Context, url string) (domain.Account, er
 	var resp *http.Response
 	var data []byte
 	ran := m.limiter.Limit(ctx, getAccountMaxOperationTime, func() {
+		start := time.Now()
 		resp, err = m.httpClient.Do(req)
 		if err != nil {
 			err := fmt.Errorf("failed to send request: %w", err)
@@ -86,6 +88,7 @@ func (m *Mojang) getProfile(ctx context.Context, url string) (domain.Account, er
 			reporting.Report(ctx, err)
 			return
 		}
+		logging.FromContext(ctx).Info("mojang request completed", "url", url, "status", resp.StatusCode, "duration", time.Since(start).String())
 	})
 	if !ran {
 		return domain.Account{}, fmt.Errorf("%w: too many requests to mojang API", domain.ErrTemporarilyUnavailable)

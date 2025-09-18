@@ -47,6 +47,7 @@ func (hypixelAPI hypixelAPIImpl) GetPlayerData(ctx context.Context, uuid string)
 	req.Header.Set("User-Agent", constants.USER_AGENT)
 	req.Header.Set("API-Key", hypixelAPI.apiKey)
 
+	start := time.Now()
 	resp, err := hypixelAPI.httpClient.Do(req)
 	if err != nil {
 		err := fmt.Errorf("failed to send request: %w", err)
@@ -65,6 +66,7 @@ func (hypixelAPI hypixelAPIImpl) GetPlayerData(ctx context.Context, uuid string)
 		reporting.Report(ctx, err)
 		return []byte{}, -1, time.Time{}, err
 	}
+	logging.FromContext(ctx).Info("hypixel request completed", "url", url, "status", resp.StatusCode, "duration", time.Since(start).String())
 
 	return data, resp.StatusCode, queriedAt, nil
 }
