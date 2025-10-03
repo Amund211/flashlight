@@ -42,9 +42,9 @@ gcloud run deploy "$service_name" \
 	--memory=128Mi \
 	--allow-unauthenticated \
 	--concurrency 100 \
+	--set-cloudsql-instances prism-overlay:northamerica-northeast2:flashlight-postgres \
 	--container 'service' \
 	--image "$image" \
-	--set-cloudsql-instances prism-overlay:northamerica-northeast2:flashlight-postgres \
 	--set-secrets HYPIXEL_API_KEY=prism-hypixel-api-key:latest \
 	--set-secrets DB_PASSWORD=flashlight-db-password:latest \
 	--set-secrets "SENTRY_DSN=${sentry_dsn_key}:latest" \
