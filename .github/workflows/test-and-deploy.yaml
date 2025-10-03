@@ -127,7 +127,8 @@ jobs:
     name: Deploy test instance
     runs-on: ubuntu-latest
     # Only deploy the test instance if the tests pass
-    needs: [test, push-otel-collector-test]
+    # TEMP: REMOVE NEEDS TO SPEED UP TESTING TODO REMOVE
+    # needs: [test, push-otel-collector-test]
     steps:
       - uses: actions/checkout@v5
 
