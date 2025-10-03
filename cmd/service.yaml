@@ -29,18 +29,18 @@ spec:
         env:
         - name: "OTEL_EXPORTER_OTLP_ENDPOINT"
           value: "http://localhost:4317"
-	    - name: "FLASHLIGHT_ENVIRONMENT"
+        - name: "FLASHLIGHT_ENVIRONMENT"
           value: "${FLASHLIGHT_ENVIRONMENT}"
-	    - name: "DB_USERNAME"
+        - name: "DB_USERNAME"
           value: "postgres"
-	    - name: "CLOUDSQL_UNIX_SOCKET"
+        - name: "CLOUDSQL_UNIX_SOCKET"
           value: "/cloudsql/prism-overlay:northamerica-northeast2:flashlight-postgres"
         secrets:
         - name: "HYPIXEL_API_KEY"
           value: "prism-hypixel-api-key:latest"
-	    - name: "DB_PASSWORD"
+        - name: "DB_PASSWORD"
           value: "flashlight-db-password:latest"
-	    - name: "SENTRY_DSN"
+        - name: "SENTRY_DSN"
           value: "${SENTRY_DSN_KEY}:latest"
       - image: ${COLLECTOR_IMAGE}
         name: collector
