@@ -38,7 +38,7 @@ docker push "$image"
 # We're currently not doing this.
 # Ref: https://cloud.google.com/stackdriver/docs/instrumentation/choose-approach#run
 
-gcloud run deploy "$service_name" \
+gcloud beta run deploy "$service_name" \
 	--region=northamerica-northeast2 \
 	--max-instances=1 \
 	--min-instances=0 \
@@ -48,6 +48,7 @@ gcloud run deploy "$service_name" \
 	--set-cloudsql-instances prism-overlay:northamerica-northeast2:flashlight-postgres \
 	--container 'service' \
 	--image "$image" \
+	--port 8080 \
 	--cpu=1 \
 	--memory=128Mi \
 	--set-secrets HYPIXEL_API_KEY=prism-hypixel-api-key:latest \
@@ -56,7 +57,6 @@ gcloud run deploy "$service_name" \
 	--set-env-vars "FLASHLIGHT_ENVIRONMENT=${environment}" \
 	--set-env-vars 'DB_USERNAME=postgres' \
 	--set-env-vars 'CLOUDSQL_UNIX_SOCKET=/cloudsql/prism-overlay:northamerica-northeast2:flashlight-postgres' \
-	--port 8080 \
 	--container 'otel-sidecar' \
 	--image "$sidecar_image" \
 	--startup-probe='httpGet.port=13133,httpGet.path=/'
