@@ -45,7 +45,9 @@ SERVICE_NAME="$service_name" \
 	FLASHLIGHT_ENVIRONMENT="$environment" \
 	SENTRY_DSN_KEY="$sentry_dsn_key" \
 	COLLECTOR_IMAGE="$sidecar_image" \
-	gcloud run services replace "$script_dir/service.yaml"
+	envsubst <"$script_dir/service.tmpl.yaml" >"$script_dir/service.yaml"
+
+gcloud run services replace "$script_dir/service.yaml"
 
 # Verify that newly deployed function works
 echo 'Making request to new deployment' >&2
