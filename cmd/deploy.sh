@@ -48,6 +48,7 @@ gcloud run deploy "$service_name" \
 	--set-cloudsql-instances prism-overlay:northamerica-northeast2:flashlight-postgres \
 	--container 'service' \
 	--image "$image" \
+	--port 8080 \
 	--cpu=1 \
 	--memory=128Mi \
 	--set-secrets HYPIXEL_API_KEY=prism-hypixel-api-key:latest \
