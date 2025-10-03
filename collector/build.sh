@@ -29,7 +29,7 @@ get-url)
     exit 0
     ;;
 build-and-push)
-    docker build -t "$image" .
+    docker build -t "$image" "$(dirname "$0")"
     docker push "$image"
 
     exit 0
