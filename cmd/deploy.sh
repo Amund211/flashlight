@@ -2,6 +2,8 @@
 
 set -eu
 
+script_dir="$(dirname "$0")"
+
 docker_repository_url='northamerica-northeast2-docker.pkg.dev/prism-overlay/flashlight-dockerimages'
 
 function_name="${1:-}"
@@ -25,29 +27,27 @@ flashlight-test)
 	;;
 esac
 
+sidecar_image="$("$script_dir/../collector/build.sh" get-url "$function_name")"
+
 image="$docker_repository_url/$image_name:latest"
 
-docker build -t "$image" .
+# TEMP: SKIP BUILD: TODO REVERT ACTUALLY BUILD
+# docker build -t "$image" .
 
-docker push "$image"
+# docker push "$image"
 
-gcloud run deploy "$service_name" \
-	--image "$image" \
-	--region=northamerica-northeast2 \
-	--max-instances=1 \
-	--min-instances=0 \
-	--timeout=30s \
-	--cpu=1 \
-	--memory=128Mi \
-	--allow-unauthenticated \
-	--concurrency 100 \
-	--set-cloudsql-instances prism-overlay:northamerica-northeast2:flashlight-postgres \
-	--set-secrets HYPIXEL_API_KEY=prism-hypixel-api-key:latest \
-	--set-secrets DB_PASSWORD=flashlight-db-password:latest \
-	--set-secrets "SENTRY_DSN=${sentry_dsn_key}:latest" \
-	--set-env-vars "FLASHLIGHT_ENVIRONMENT=${environment}" \
-	--set-env-vars 'DB_USERNAME=postgres' \
-	--set-env-vars 'CLOUDSQL_UNIX_SOCKET=/cloudsql/prism-overlay:northamerica-northeast2:flashlight-postgres'
+# NOTE: Since we're using a sidecar for metric collection, it is recommended to use an
+# always-allocated CPU
+# We're currently not doing this.
+# Ref: https://cloud.google.com/stackdriver/docs/instrumentation/choose-approach#run
+SERVICE_NAME="$service_name" \
+	SERVICE_IMAGE="$image" \
+	FLASHLIGHT_ENVIRONMENT="$environment" \
+	SENTRY_DSN_KEY="$sentry_dsn_key" \
+	COLLECTOR_IMAGE="$sidecar_image" \
+	envsubst <"$script_dir/service.tmpl.yaml" >"$script_dir/service.yaml"
+
+gcloud run services replace "$script_dir/service.yaml"
 
 # Verify that newly deployed function works
 echo 'Making request to new deployment' >&2
