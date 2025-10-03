@@ -31,9 +31,10 @@ sidecar_image="$("$script_dir/../collector/build.sh" get-url "$function_name")"
 
 image="$docker_repository_url/$image_name:latest"
 
-docker build -t "$image" .
+# TEMP: SKIP BUILD: TODO REVERT ACTUALLY BUILD
+# docker build -t "$image" .
 
-docker push "$image"
+# docker push "$image"
 
 # NOTE: Since we're using a sidecar for metric collection, it is recommended to use an
 # always-allocated CPU
