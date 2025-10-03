@@ -13,7 +13,25 @@ import (
 	"github.com/Amund211/flashlight/internal/logging"
 	"github.com/Amund211/flashlight/internal/ratelimiting"
 	"github.com/Amund211/flashlight/internal/reporting"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 )
+
+const name = "github.com/Amund211/flashlight/internal/adapters/playerprovider"
+
+var (
+	meter          = otel.Meter(name)
+	apiRequestsCnt metric.Int64Counter
+)
+
+func init() {
+	var err error
+	apiRequestsCnt, err = meter.Int64Counter("playerprovider/hypixel_api_requests")
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create playerprovider/hypixel_api_requests metric: %v", err))
+	}
+}
 
 const getPlayerDataMinOperationTime = 100 * time.Millisecond
 
@@ -79,6 +97,10 @@ func (hypixelAPI hypixelAPIImpl) GetPlayerData(ctx context.Context, uuid string)
 			reporting.Report(ctx, err)
 			return
 		}
+
+		apiRequestsCnt.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("status_code", fmt.Sprintf("%d", resp.StatusCode)),
+		))
 	})
 	if !ran {
 		return []byte{}, -1, time.Time{}, fmt.Errorf("%w: too many requests to Hypixel API", domain.ErrTemporarilyUnavailable)
