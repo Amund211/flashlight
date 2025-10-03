@@ -5,7 +5,7 @@ metadata:
   labels:
     cloud.googleapis.com/location: "northamerica-northeast2"
   annotations:
-    run.googleapis.com/ingress: all
+    run.googleapis.com/ingress: "all"
 spec:
   template:
     metadata:
@@ -35,16 +35,24 @@ spec:
           value: "postgres"
         - name: "CLOUDSQL_UNIX_SOCKET"
           value: "/cloudsql/prism-overlay:northamerica-northeast2:flashlight-postgres"
-        secrets:
         - name: "HYPIXEL_API_KEY"
-          value: "prism-hypixel-api-key:latest"
+          valueFrom:
+            secretKeyRef:
+              name: "prism-hypixel-api-key"
+              key: "latest"
         - name: "DB_PASSWORD"
-          value: "flashlight-db-password:latest"
+          valueFrom:
+            secretKeyRef:
+              name: "flashlight-db-password"
+              key: "latest"
         - name: "SENTRY_DSN"
-          value: "${SENTRY_DSN_KEY}:latest"
-      - image: ${COLLECTOR_IMAGE}
-        name: collector
+          valueFrom:
+            secretKeyRef:
+              name: "${SENTRY_DSN_KEY}"
+              key: "latest"
+      - image: "${COLLECTOR_IMAGE}"
+        name: "collector"
         startupProbe:
           httpGet:
-            path: /
+            path: "/"
             port: 13133
