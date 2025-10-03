@@ -58,6 +58,7 @@ gcloud run deploy "$service_name" \
 	--set-env-vars 'DB_USERNAME=postgres' \
 	--set-env-vars 'CLOUDSQL_UNIX_SOCKET=/cloudsql/prism-overlay:northamerica-northeast2:flashlight-postgres' \
 	--container 'otel-sidecar' \
+	--clear-port \
 	--image "$sidecar_image" \
 	--startup-probe='httpGet.port=13133,httpGet.path=/'
 
