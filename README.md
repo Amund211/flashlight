@@ -31,6 +31,9 @@ echo 'export HYPIXEL_API_KEY=<your-key-here>' > cmd/.env
 ### Test it
 ```bash
 curl 'localhost:8123/v1/playerdata?uuid=<some-uuid>'
+
+# Or use the new V2 endpoint with cleaner JSON structure:
+curl 'localhost:8123/v2/player/<some-uuid>'
 ```
 
 ## Creator info
