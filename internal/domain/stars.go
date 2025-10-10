@@ -32,7 +32,7 @@ func ExperienceToStars(experience int64) float64 {
 	remainingExperience := float64(experience % expPerPrestige)
 
 	stars := prestiges * 100
-	
+
 	// The first few levels have different costs after each prestige
 	for star := 1; star <= 100; star++ {
 		expForStar := 5000.0
