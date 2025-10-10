@@ -27,30 +27,35 @@ func StarsToExperience(stars int) int64 {
 	return exp
 }
 
-func ExperienceToStars(experience int64) int {
-	prestiges := int(experience / expPerPrestige)
-	remainingExperience := int(experience % expPerPrestige)
+func ExperienceToStars(experience int64) float64 {
+	prestiges := float64(experience / expPerPrestige)
+	remainingExperience := float64(experience % expPerPrestige)
 
 	stars := prestiges * 100
+	
+	// The first few levels have different costs after each prestige
 	for star := 1; star <= 100; star++ {
-		expForStar := 5000
+		expForStar := 5000.0
 		switch star {
 		case 1:
-			expForStar = 500
+			expForStar = 500.0
 		case 2:
-			expForStar = 1000
+			expForStar = 1000.0
 		case 3:
-			expForStar = 2000
+			expForStar = 2000.0
 		case 4:
-			expForStar = 3500
+			expForStar = 3500.0
 		}
 
-		if remainingExperience < expForStar {
+		if remainingExperience >= expForStar {
+			remainingExperience -= expForStar
+			stars += 1.0
+		} else {
+			// We can't afford the next level, so we have found the level we are at
+			// Add the fractional progress towards the next level
+			stars += remainingExperience / expForStar
 			break
 		}
-
-		remainingExperience -= expForStar
-		stars++
 	}
 
 	return stars
