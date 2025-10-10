@@ -237,6 +237,20 @@ func main() {
 		),
 	)
 
+	http.HandleFunc(
+		"OPTIONS /v2/player/{uuid}",
+		ports.BuildCORSHandler(allowedOrigins),
+	)
+	http.HandleFunc(
+		"GET /v2/player/{uuid}",
+		ports.MakeGetV2PlayerHandler(
+			getAndPersistPlayerWithCache,
+			allowedOrigins,
+			logger.With("port", "v2-player"),
+			sentryMiddleware,
+		),
+	)
+
 	// TODO: Remove
 	handleFunc(
 		"GET /playerdata",
