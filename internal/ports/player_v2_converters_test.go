@@ -75,13 +75,13 @@ func TestDomainGamemodeStatsToV2(t *testing.T) {
 	})
 }
 
-func TestDomainPlayerToV2Player(t *testing.T) {
+func TestDomainPlayerToPlayerV2(t *testing.T) {
 	t.Parallel()
 
 	t.Run("nil player", func(t *testing.T) {
 		t.Parallel()
 
-		result := domainPlayerToV2Player(nil)
+		result := domainPlayerToPlayerV2(nil)
 		require.Nil(t, result)
 	})
 
@@ -101,7 +101,7 @@ func TestDomainPlayerToV2Player(t *testing.T) {
 			LastLogin:           &lastLogin,
 			LastLogout:          &lastLogout,
 			MissingBedwarsStats: true,
-			Experience:          1500.75,
+			Experience:          1500,
 			Solo: domain.GamemodeStatsPIT{
 				Winstreak:   func() *int { i := 5; return &i }(),
 				GamesPlayed: 50,
@@ -125,7 +125,7 @@ func TestDomainPlayerToV2Player(t *testing.T) {
 			},
 		}
 
-		v2Player := domainPlayerToV2Player(domainPlayer)
+		v2Player := domainPlayerToPlayerV2(domainPlayer)
 
 		require.NotNil(t, v2Player)
 		require.Equal(t, now, v2Player.QueriedAt)
@@ -134,20 +134,15 @@ func TestDomainPlayerToV2Player(t *testing.T) {
 		require.Equal(t, &lastLogin, v2Player.LastLogin)
 		require.Equal(t, &lastLogout, v2Player.LastLogout)
 		require.Equal(t, true, v2Player.MissingBedwarsStats)
-		require.Equal(t, 1500.75, v2Player.Experience)
+		require.Equal(t, int64(1500), v2Player.Experience)
 
-		require.Equal(t, 50, v2Player.Solo.GamesPlayed)
-		require.Equal(t, 40, v2Player.Solo.Wins)
-		require.NotNil(t, v2Player.Solo.Winstreak)
-		require.Equal(t, 5, *v2Player.Solo.Winstreak)
-
-		require.Equal(t, 25, v2Player.Doubles.GamesPlayed)
-		require.Equal(t, 20, v2Player.Doubles.Wins)
-		require.Nil(t, v2Player.Doubles.Winstreak)
+		require.Equal(t, 90, v2Player.Overall.GamesPlayed)
+		require.Equal(t, 72, v2Player.Overall.Wins)
+		require.Nil(t, v2Player.Overall.Winstreak)
 	})
 }
 
-func TestPlayerToV2PlayerResponseData(t *testing.T) {
+func TestPlayerToPlayerResponseDataV2(t *testing.T) {
 	t.Parallel()
 
 	t.Run("success with player", func(t *testing.T) {
@@ -157,10 +152,10 @@ func TestPlayerToV2PlayerResponseData(t *testing.T) {
 		now := time.Now()
 		player := domaintest.NewPlayerBuilder(UUID, now).WithExperience(1000).BuildPtr()
 
-		data, err := PlayerToV2PlayerResponseData(player)
+		data, err := PlayerToPlayerResponseDataV2(player)
 		require.NoError(t, err)
 
-		var response V2PlayerResponse
+		var response PlayerResponseV2
 		err = json.Unmarshal(data, &response)
 		require.NoError(t, err)
 
@@ -168,16 +163,16 @@ func TestPlayerToV2PlayerResponseData(t *testing.T) {
 		require.NotNil(t, response.Player)
 		require.Nil(t, response.Cause)
 		require.Equal(t, UUID, response.Player.UUID)
-		require.Equal(t, 1000.0, response.Player.Experience)
+		require.Equal(t, int64(1000), response.Player.Experience)
 	})
 
 	t.Run("nil player", func(t *testing.T) {
 		t.Parallel()
 
-		data, err := PlayerToV2PlayerResponseData(nil)
+		data, err := PlayerToPlayerResponseDataV2(nil)
 		require.NoError(t, err)
 
-		var response V2PlayerResponse
+		var response PlayerResponseV2
 		err = json.Unmarshal(data, &response)
 		require.NoError(t, err)
 
@@ -187,17 +182,17 @@ func TestPlayerToV2PlayerResponseData(t *testing.T) {
 	})
 }
 
-func TestPlayerToV2PlayerErrorResponseData(t *testing.T) {
+func TestPlayerToPlayerErrorResponseDataV2(t *testing.T) {
 	t.Parallel()
 
 	t.Run("error response", func(t *testing.T) {
 		t.Parallel()
 
 		cause := "Something went wrong"
-		data, err := PlayerToV2PlayerErrorResponseData(cause)
+		data, err := PlayerToPlayerErrorResponseDataV2(cause)
 		require.NoError(t, err)
 
-		var response V2PlayerResponse
+		var response PlayerResponseV2
 		err = json.Unmarshal(data, &response)
 		require.NoError(t, err)
 

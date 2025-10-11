@@ -237,16 +237,16 @@ func main() {
 		),
 	)
 
-	http.HandleFunc(
+	handleFunc(
 		"OPTIONS /v2/player/{uuid}",
 		ports.BuildCORSHandler(allowedOrigins),
 	)
-	http.HandleFunc(
+	handleFunc(
 		"GET /v2/player/{uuid}",
-		ports.MakeGetV2PlayerHandler(
+		ports.MakeGetPlayerV2Handler(
 			getAndPersistPlayerWithCache,
 			allowedOrigins,
-			logger.With("port", "v2-player"),
+			logger.With("port", "player-v2"),
 			sentryMiddleware,
 		),
 	)

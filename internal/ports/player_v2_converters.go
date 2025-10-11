@@ -8,15 +8,15 @@ import (
 	"github.com/Amund211/flashlight/internal/domain"
 )
 
-// V2 Player response structures that closely match the domain structs with json tags
+// Player V2 response structures that closely match the domain structs with json tags
 
-type V2PlayerResponse struct {
-	Success bool       `json:"success"`
-	Player  *V2Player  `json:"player"`
-	Cause   *string    `json:"cause,omitempty"`
+type PlayerResponseV2 struct {
+	Success bool     `json:"success"`
+	Player  *PlayerV2 `json:"player"`
+	Cause   *string  `json:"cause,omitempty"`
 }
 
-type V2Player struct {
+type PlayerV2 struct {
 	QueriedAt time.Time `json:"queriedAt"`
 	UUID      string    `json:"uuid"`
 	
@@ -24,17 +24,13 @@ type V2Player struct {
 	LastLogin   *time.Time `json:"lastLogin,omitempty"`
 	LastLogout  *time.Time `json:"lastLogout,omitempty"`
 	
-	MissingBedwarsStats bool    `json:"missingBedwarsStats"`
-	Experience          float64 `json:"experience"`
+	MissingBedwarsStats bool  `json:"missingBedwarsStats"`
+	Experience          int64 `json:"experience"`
 	
-	Solo    V2GamemodeStats `json:"solo"`
-	Doubles V2GamemodeStats `json:"doubles"`
-	Threes  V2GamemodeStats `json:"threes"`
-	Fours   V2GamemodeStats `json:"fours"`
-	Overall V2GamemodeStats `json:"overall"`
+	Overall GamemodeStatsV2 `json:"overall"`
 }
 
-type V2GamemodeStats struct {
+type GamemodeStatsV2 struct {
 	Winstreak   *int `json:"winstreak,omitempty"`
 	GamesPlayed int  `json:"gamesPlayed"`
 	Wins        int  `json:"wins"`
@@ -47,8 +43,8 @@ type V2GamemodeStats struct {
 	Deaths      int  `json:"deaths"`
 }
 
-func domainGamemodeStatsToV2(stats *domain.GamemodeStatsPIT) V2GamemodeStats {
-	return V2GamemodeStats{
+func domainGamemodeStatsToV2(stats *domain.GamemodeStatsPIT) GamemodeStatsV2 {
+	return GamemodeStatsV2{
 		Winstreak:   stats.Winstreak,
 		GamesPlayed: stats.GamesPlayed,
 		Wins:        stats.Wins,
@@ -62,12 +58,12 @@ func domainGamemodeStatsToV2(stats *domain.GamemodeStatsPIT) V2GamemodeStats {
 	}
 }
 
-func domainPlayerToV2Player(player *domain.PlayerPIT) *V2Player {
+func domainPlayerToPlayerV2(player *domain.PlayerPIT) *PlayerV2 {
 	if player == nil {
 		return nil
 	}
 	
-	return &V2Player{
+	return &PlayerV2{
 		QueriedAt:           player.QueriedAt,
 		UUID:                player.UUID,
 		Displayname:         player.Displayname,
@@ -75,39 +71,35 @@ func domainPlayerToV2Player(player *domain.PlayerPIT) *V2Player {
 		LastLogout:          player.LastLogout,
 		MissingBedwarsStats: player.MissingBedwarsStats,
 		Experience:          player.Experience,
-		Solo:                domainGamemodeStatsToV2(&player.Solo),
-		Doubles:             domainGamemodeStatsToV2(&player.Doubles),
-		Threes:              domainGamemodeStatsToV2(&player.Threes),
-		Fours:               domainGamemodeStatsToV2(&player.Fours),
 		Overall:             domainGamemodeStatsToV2(&player.Overall),
 	}
 }
 
-func PlayerToV2PlayerResponseData(player *domain.PlayerPIT) ([]byte, error) {
-	response := V2PlayerResponse{
+func PlayerToPlayerResponseDataV2(player *domain.PlayerPIT) ([]byte, error) {
+	response := PlayerResponseV2{
 		Success: true,
 	}
 	
 	// Always set the Player field, even if it's nil - this will ensure "player":null in JSON
-	response.Player = domainPlayerToV2Player(player)
+	response.Player = domainPlayerToPlayerV2(player)
 	
 	data, err := json.Marshal(response)
 	if err != nil {
-		return []byte{}, fmt.Errorf("failed to marshal V2 player response: %w", err)
+		return []byte{}, fmt.Errorf("failed to marshal player V2 response: %w", err)
 	}
 	
 	return data, nil
 }
 
-func PlayerToV2PlayerErrorResponseData(cause string) ([]byte, error) {
-	response := V2PlayerResponse{
+func PlayerToPlayerErrorResponseDataV2(cause string) ([]byte, error) {
+	response := PlayerResponseV2{
 		Success: false,
 		Cause:   &cause,
 	}
 	
 	data, err := json.Marshal(response)
 	if err != nil {
-		return []byte{}, fmt.Errorf("failed to marshal V2 player error response: %w", err)
+		return []byte{}, fmt.Errorf("failed to marshal player V2 error response: %w", err)
 	}
 	
 	return data, nil

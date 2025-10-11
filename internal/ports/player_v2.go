@@ -15,7 +15,7 @@ import (
 	"github.com/Amund211/flashlight/internal/strutils"
 )
 
-func MakeGetV2PlayerHandler(
+func MakeGetPlayerV2Handler(
 	getAndPersistPlayerWithCache app.GetAndPersistPlayerWithCache,
 	allowedOrigins *DomainSuffixes,
 	rootLogger *slog.Logger,
@@ -49,7 +49,7 @@ func MakeGetV2PlayerHandler(
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(statusCode)
 			
-			errorData, err := PlayerToV2PlayerErrorResponseData("Rate limit exceeded")
+			errorData, err := PlayerToPlayerErrorResponseDataV2("Rate limit exceeded")
 			if err != nil {
 				w.Write([]byte(`{"success":false,"cause":"Rate limit exceeded"}`))
 			} else {
@@ -96,7 +96,7 @@ func MakeGetV2PlayerHandler(
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(statusCode)
 			
-			errorData, marshalErr := PlayerToV2PlayerErrorResponseData("Invalid UUID")
+			errorData, marshalErr := PlayerToPlayerErrorResponseDataV2("Invalid UUID")
 			if marshalErr != nil {
 				w.Write([]byte(`{"success":false,"cause":"Invalid UUID"}`))
 			} else {
@@ -115,7 +115,7 @@ func MakeGetV2PlayerHandler(
 
 		player, err := getAndPersistPlayerWithCache(ctx, uuid)
 		if errors.Is(err, domain.ErrPlayerNotFound) {
-			v2ResponseData, err := PlayerToV2PlayerResponseData(nil)
+			v2ResponseData, err := PlayerToPlayerResponseDataV2(nil)
 			if err != nil {
 				logger.Error("Failed to convert player to V2 response", "error", err)
 				err = fmt.Errorf("failed to convert player to V2 response: %w", err)
@@ -141,7 +141,7 @@ func MakeGetV2PlayerHandler(
 			return
 		}
 
-		v2ResponseData, err := PlayerToV2PlayerResponseData(player)
+		v2ResponseData, err := PlayerToPlayerResponseDataV2(player)
 		if err != nil {
 			logger.Error("Failed to convert player to V2 response", "error", err)
 
@@ -177,7 +177,7 @@ func writeV2ErrorResponse(ctx context.Context, w http.ResponseWriter, responseEr
 		cause = "Service temporarily unavailable"
 	}
 
-	errorData, err := PlayerToV2PlayerErrorResponseData(cause)
+	errorData, err := PlayerToPlayerErrorResponseDataV2(cause)
 	if err != nil {
 		logging.FromContext(ctx).Error("Failed to marshal V2 error response", "error", err)
 		reporting.Report(ctx, fmt.Errorf("failed to marshal V2 error response: %w", err), map[string]string{
