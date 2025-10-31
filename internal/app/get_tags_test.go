@@ -14,11 +14,11 @@ import (
 type mockTagProvider struct {
 	t *testing.T
 
-	getTagsUUID    string
-	getTagsAPIKey  *string
-	getTagsCalled  bool
-	getTagsTags    domain.Tags
-	getTagsErr     error
+	getTagsUUID   string
+	getTagsAPIKey *string
+	getTagsCalled bool
+	getTagsTags   domain.Tags
+	getTagsErr    error
 }
 
 func (m *mockTagProvider) GetTags(ctx context.Context, uuid string, apiKey *string) (domain.Tags, error) {
@@ -49,8 +49,8 @@ func TestBuildGetTagsWithCache(t *testing.T) {
 
 		c := cache.NewBasicCache[domain.Tags]()
 		provider := &mockTagProvider{
-			t:            t,
-			getTagsUUID:  UUID,
+			t:             t,
+			getTagsUUID:   UUID,
 			getTagsAPIKey: nil,
 			getTagsTags: domain.Tags{
 				Cheating: domain.TagSeverityHigh,
@@ -102,10 +102,10 @@ func TestBuildGetTagsWithCache(t *testing.T) {
 
 		c := cache.NewBasicCache[domain.Tags]()
 		provider := &mockTagProvider{
-			t:            t,
-			getTagsUUID:  UUID,
+			t:             t,
+			getTagsUUID:   UUID,
 			getTagsAPIKey: nil,
-			getTagsErr:   assert.AnError,
+			getTagsErr:    assert.AnError,
 		}
 		getTagsWithCache, err := app.BuildGetTagsWithCache(c, provider)
 		require.NoError(t, err)
@@ -121,8 +121,8 @@ func TestBuildGetTagsWithCache(t *testing.T) {
 
 		c := cache.NewBasicCache[domain.Tags]()
 		provider := &mockTagProvider{
-			t:            t,
-			getTagsUUID:  UUID,
+			t:             t,
+			getTagsUUID:   UUID,
 			getTagsAPIKey: nil,
 			getTagsTags: domain.Tags{
 				Cheating: domain.TagSeverityMedium,
@@ -231,8 +231,8 @@ func TestBuildGetTagsWithCache(t *testing.T) {
 
 		// First call without API key
 		provider := &mockTagProvider{
-			t:            t,
-			getTagsUUID:  UUID,
+			t:             t,
+			getTagsUUID:   UUID,
 			getTagsAPIKey: nil,
 			getTagsTags: domain.Tags{
 				Cheating: domain.TagSeverityNone,
