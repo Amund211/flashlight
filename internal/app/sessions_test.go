@@ -370,6 +370,84 @@ func TestBuildGetBestSessions(t *testing.T) {
 			getSessionsErr: assert.AnError,
 			expectedErrMsg: "assert.AnError",
 		},
+		{
+			name: "comprehensive metric test",
+			sessions: []domain.Session{
+				// Session 0: Best playtime (5 hours)
+				{
+					Start: domaintest.NewPlayerBuilder(uuid, now).
+						WithExperience(500).
+						WithOverallStats(domaintest.NewStatsBuilder().
+							WithGamesPlayed(10).
+							WithFinalKills(100).
+							WithFinalDeaths(50).
+							WithWins(5).
+							Build()).
+						Build(),
+					End: domaintest.NewPlayerBuilder(uuid, now.Add(5*time.Hour)).
+						WithExperience(600).
+						WithOverallStats(domaintest.NewStatsBuilder().
+							WithGamesPlayed(15).
+							WithFinalKills(110).
+							WithFinalDeaths(60).
+							WithWins(7).
+							Build()).
+						Build(),
+					Consecutive: true,
+				},
+				// Session 1: Best final kills (50) and best wins (10)
+				{
+					Start: domaintest.NewPlayerBuilder(uuid, now.Add(6*time.Hour)).
+						WithExperience(600).
+						WithOverallStats(domaintest.NewStatsBuilder().
+							WithGamesPlayed(15).
+							WithFinalKills(110).
+							WithFinalDeaths(60).
+							WithWins(7).
+							Build()).
+						Build(),
+					End: domaintest.NewPlayerBuilder(uuid, now.Add(7*time.Hour)).
+						WithExperience(700).
+						WithOverallStats(domaintest.NewStatsBuilder().
+							WithGamesPlayed(25).
+							WithFinalKills(160).
+							WithFinalDeaths(65).
+							WithWins(17).
+							Build()).
+						Build(),
+					Consecutive: true,
+				},
+				// Session 2: Best FKDR (20/1 = 20.0) and best stars
+				{
+					Start: domaintest.NewPlayerBuilder(uuid, now.Add(8*time.Hour)).
+						WithExperience(700).
+						WithOverallStats(domaintest.NewStatsBuilder().
+							WithGamesPlayed(25).
+							WithFinalKills(160).
+							WithFinalDeaths(65).
+							WithWins(17).
+							Build()).
+						Build(),
+					End: domaintest.NewPlayerBuilder(uuid, now.Add(9*time.Hour)).
+						WithExperience(50000).
+						WithOverallStats(domaintest.NewStatsBuilder().
+							WithGamesPlayed(30).
+							WithFinalKills(180).
+							WithFinalDeaths(66).
+							WithWins(20).
+							Build()).
+						Build(),
+					Consecutive: true,
+				},
+			},
+			expectedBest: &domain.BestSessions{
+				Playtime:   nil, // Session 0 (5 hours)
+				FinalKills: nil, // Session 1 (50 final kills)
+				Wins:       nil, // Session 1 (10 wins)
+				FKDR:       nil, // Session 2 (20/1 = 20.0)
+				Stars:      nil, // Session 2 (highest stars)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -437,6 +515,34 @@ func TestBuildGetBestSessions(t *testing.T) {
 				require.Nil(t, result.Wins)
 				require.Nil(t, result.FKDR)
 				require.Nil(t, result.Stars)
+			}
+
+			// For comprehensive metric test
+			if tt.name == "comprehensive metric test" {
+				// Session 0 has best playtime (5 hours)
+				require.NotNil(t, result.Playtime)
+				require.Equal(t, 5*time.Hour, result.Playtime.End.QueriedAt.Sub(result.Playtime.Start.QueriedAt))
+
+				// Session 1 has best final kills (50)
+				require.NotNil(t, result.FinalKills)
+				fkDiff := result.FinalKills.End.Overall.FinalKills - result.FinalKills.Start.Overall.FinalKills
+				require.Equal(t, 50, fkDiff)
+
+				// Session 1 has best wins (10)
+				require.NotNil(t, result.Wins)
+				winsDiff := result.Wins.End.Overall.Wins - result.Wins.Start.Overall.Wins
+				require.Equal(t, 10, winsDiff)
+
+				// Session 2 has best FKDR (20/1 = 20.0)
+				require.NotNil(t, result.FKDR)
+				fkdrFk := result.FKDR.End.Overall.FinalKills - result.FKDR.Start.Overall.FinalKills
+				fkdrFd := result.FKDR.End.Overall.FinalDeaths - result.FKDR.Start.Overall.FinalDeaths
+				fkdr := float64(fkdrFk) / float64(fkdrFd)
+				require.InDelta(t, 20.0, fkdr, 0.01)
+
+				// Session 2 has highest stars
+				require.NotNil(t, result.Stars)
+				require.Equal(t, int64(50000), result.Stars.End.Experience)
 			}
 		})
 	}
