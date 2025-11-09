@@ -61,104 +61,79 @@ type GetBestSessions = func(
 	ctx context.Context,
 	uuid string,
 	start, end time.Time,
-) (*domain.BestSessions, error)
+) (domain.BestSessions, error)
 
 func BuildGetBestSessions(getSessions GetSessions) GetBestSessions {
 	return func(ctx context.Context,
 		uuid string,
 		start, end time.Time,
-	) (*domain.BestSessions, error) {
+	) (domain.BestSessions, error) {
 		sessions, err := getSessions(ctx, uuid, start, end)
 		if err != nil {
-			return nil, err
+			return domain.BestSessions{}, err
 		}
 
 		if len(sessions) == 0 {
-			return &domain.BestSessions{}, nil
+			return domain.BestSessions{}, nil
 		}
 
-		bestSessions := &domain.BestSessions{}
+		// Helper function to get the best session based on a comparison function
+		getBest := func(current domain.Session, candidate domain.Session, getValue func(domain.Session) float64) domain.Session {
+			currentValue := getValue(current)
+			candidateValue := getValue(candidate)
+			if candidateValue > currentValue {
+				return candidate
+			}
+			return current
+		}
 
-		for i := range sessions {
-			session := &sessions[i]
+		// Metric extraction functions
+		getPlaytime := func(s domain.Session) float64 {
+			return float64(s.End.QueriedAt.Sub(s.Start.QueriedAt))
+		}
 
-			// Calculate metrics for this session
-			playtime := session.End.QueriedAt.Sub(session.Start.QueriedAt)
-			finalKills := session.End.Overall.FinalKills - session.Start.Overall.FinalKills
-			wins := session.End.Overall.Wins - session.Start.Overall.Wins
-			stars := session.End.Stars()
+		getFinalKills := func(s domain.Session) float64 {
+			return float64(s.End.Overall.FinalKills - s.Start.Overall.FinalKills)
+		}
 
-			// FKDR calculation
-			finalDeaths := session.End.Overall.FinalDeaths - session.Start.Overall.FinalDeaths
-			var fkdr float64
+		getWins := func(s domain.Session) float64 {
+			return float64(s.End.Overall.Wins - s.Start.Overall.Wins)
+		}
+
+		getFKDR := func(s domain.Session) float64 {
+			finalKills := s.End.Overall.FinalKills - s.Start.Overall.FinalKills
+			finalDeaths := s.End.Overall.FinalDeaths - s.Start.Overall.FinalDeaths
 			if finalDeaths > 0 {
-				fkdr = float64(finalKills) / float64(finalDeaths)
+				return float64(finalKills) / float64(finalDeaths)
 			} else if finalKills > 0 {
-				fkdr = float64(finalKills)
-			} else {
-				fkdr = 0
+				return float64(finalKills)
 			}
-
-			// Update best session for playtime
-			if bestSessions.Playtime == nil {
-				bestSessions.Playtime = session
-			} else {
-				bestPlaytime := bestSessions.Playtime.End.QueriedAt.Sub(bestSessions.Playtime.Start.QueriedAt)
-				if playtime > bestPlaytime {
-					bestSessions.Playtime = session
-				}
-			}
-
-			// Update best session for final kills
-			if bestSessions.FinalKills == nil {
-				bestSessions.FinalKills = session
-			} else {
-				bestFinalKills := bestSessions.FinalKills.End.Overall.FinalKills - bestSessions.FinalKills.Start.Overall.FinalKills
-				if finalKills > bestFinalKills {
-					bestSessions.FinalKills = session
-				}
-			}
-
-			// Update best session for wins
-			if bestSessions.Wins == nil {
-				bestSessions.Wins = session
-			} else {
-				bestWins := bestSessions.Wins.End.Overall.Wins - bestSessions.Wins.Start.Overall.Wins
-				if wins > bestWins {
-					bestSessions.Wins = session
-				}
-			}
-
-			// Update best session for FKDR
-			if bestSessions.FKDR == nil {
-				bestSessions.FKDR = session
-			} else {
-				bestFinalKills := bestSessions.FKDR.End.Overall.FinalKills - bestSessions.FKDR.Start.Overall.FinalKills
-				bestFinalDeaths := bestSessions.FKDR.End.Overall.FinalDeaths - bestSessions.FKDR.Start.Overall.FinalDeaths
-				var bestFKDR float64
-				if bestFinalDeaths > 0 {
-					bestFKDR = float64(bestFinalKills) / float64(bestFinalDeaths)
-				} else if bestFinalKills > 0 {
-					bestFKDR = float64(bestFinalKills)
-				} else {
-					bestFKDR = 0
-				}
-				if fkdr > bestFKDR {
-					bestSessions.FKDR = session
-				}
-			}
-
-			// Update best session for stars
-			if bestSessions.Stars == nil {
-				bestSessions.Stars = session
-			} else {
-				bestStars := bestSessions.Stars.End.Stars()
-				if stars > bestStars {
-					bestSessions.Stars = session
-				}
-			}
+			return 0
 		}
 
-		return bestSessions, nil
+		getStars := func(s domain.Session) float64 {
+			return s.End.Stars() - s.Start.Stars()
+		}
+
+		// Initialize with first session
+		best := domain.BestSessions{
+			Playtime:   sessions[0],
+			FinalKills: sessions[0],
+			Wins:       sessions[0],
+			FKDR:       sessions[0],
+			Stars:      sessions[0],
+		}
+
+		// Iterate through remaining sessions
+		for i := 1; i < len(sessions); i++ {
+			session := sessions[i]
+			best.Playtime = getBest(best.Playtime, session, getPlaytime)
+			best.FinalKills = getBest(best.FinalKills, session, getFinalKills)
+			best.Wins = getBest(best.Wins, session, getWins)
+			best.FKDR = getBest(best.FKDR, session, getFKDR)
+			best.Stars = getBest(best.Stars, session, getStars)
+		}
+
+		return best, nil
 	}
 }

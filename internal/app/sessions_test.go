@@ -260,14 +260,12 @@ func TestBuildGetBestSessions(t *testing.T) {
 	tests := []struct {
 		name           string
 		sessions       []domain.Session
-		expectedBest   *domain.BestSessions
 		expectedErrMsg string
 		getSessionsErr error
 	}{
 		{
-			name:         "empty sessions",
-			sessions:     []domain.Session{},
-			expectedBest: &domain.BestSessions{},
+			name:     "empty sessions",
+			sessions: []domain.Session{},
 		},
 		{
 			name: "single session",
@@ -290,18 +288,11 @@ func TestBuildGetBestSessions(t *testing.T) {
 					Consecutive: true,
 				},
 			},
-			expectedBest: &domain.BestSessions{
-				Playtime:   nil, // Will be set to first session
-				FinalKills: nil, // Will be set to first session
-				Wins:       nil, // Will be set to first session
-				FKDR:       nil, // Will be set to first session
-				Stars:      nil, // Will be set to first session
-			},
 		},
 		{
 			name: "multiple sessions with different bests",
 			sessions: []domain.Session{
-				// Session with most playtime
+				// Session 0: Best playtime (3 hours)
 				{
 					Start: domaintest.NewPlayerBuilder(uuid, now).
 						WithExperience(500).
@@ -319,7 +310,7 @@ func TestBuildGetBestSessions(t *testing.T) {
 						Build(),
 					Consecutive: true,
 				},
-				// Session with most final kills
+				// Session 1: Best final kills (20)
 				{
 					Start: domaintest.NewPlayerBuilder(uuid, now.Add(4*time.Hour)).
 						WithExperience(600).
@@ -337,7 +328,7 @@ func TestBuildGetBestSessions(t *testing.T) {
 						Build(),
 					Consecutive: true,
 				},
-				// Session with highest stars
+				// Session 2: Best stars delta (9300 exp gain)
 				{
 					Start: domaintest.NewPlayerBuilder(uuid, now.Add(6*time.Hour)).
 						WithExperience(700).
@@ -355,13 +346,6 @@ func TestBuildGetBestSessions(t *testing.T) {
 						Build(),
 					Consecutive: true,
 				},
-			},
-			expectedBest: &domain.BestSessions{
-				Playtime:   nil, // Will be set to session 0 (3 hours)
-				FinalKills: nil, // Will be set to session 1 (20 final kills)
-				Wins:       nil, // Will be set to session 0 (first with 0 wins)
-				FKDR:       nil, // Will be set to session 1
-				Stars:      nil, // Will be set to session 2 (highest end stars)
 			},
 		},
 		{
@@ -417,7 +401,7 @@ func TestBuildGetBestSessions(t *testing.T) {
 						Build(),
 					Consecutive: true,
 				},
-				// Session 2: Best FKDR (20/1 = 20.0) and best stars
+				// Session 2: Best FKDR (20/1 = 20.0) and best stars delta (49300 exp gain)
 				{
 					Start: domaintest.NewPlayerBuilder(uuid, now.Add(8*time.Hour)).
 						WithExperience(700).
@@ -439,13 +423,6 @@ func TestBuildGetBestSessions(t *testing.T) {
 						Build(),
 					Consecutive: true,
 				},
-			},
-			expectedBest: &domain.BestSessions{
-				Playtime:   nil, // Session 0 (5 hours)
-				FinalKills: nil, // Session 1 (50 final kills)
-				Wins:       nil, // Session 1 (10 wins)
-				FKDR:       nil, // Session 2 (20/1 = 20.0)
-				Stars:      nil, // Session 2 (highest stars)
 			},
 		},
 	}
@@ -476,15 +453,9 @@ func TestBuildGetBestSessions(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			require.NotNil(t, result)
 
-			// For single session test, all best sessions should point to the same session
+			// For single session test, all best sessions should be the same session
 			if tt.name == "single session" {
-				require.NotNil(t, result.Playtime)
-				require.NotNil(t, result.FinalKills)
-				require.NotNil(t, result.Wins)
-				require.NotNil(t, result.FKDR)
-				require.NotNil(t, result.Stars)
 				// All should be the same session
 				require.Equal(t, result.Playtime, result.FinalKills)
 				require.Equal(t, result.Playtime, result.Wins)
@@ -495,54 +466,44 @@ func TestBuildGetBestSessions(t *testing.T) {
 			// For multiple sessions test, verify the correct bests
 			if tt.name == "multiple sessions with different bests" {
 				// Session 0 has most playtime (3 hours)
-				require.NotNil(t, result.Playtime)
 				require.Equal(t, 3*time.Hour, result.Playtime.End.QueriedAt.Sub(result.Playtime.Start.QueriedAt))
 
 				// Session 1 has most final kills (20)
-				require.NotNil(t, result.FinalKills)
 				fkDiff := result.FinalKills.End.Overall.FinalKills - result.FinalKills.Start.Overall.FinalKills
 				require.Equal(t, 20, fkDiff)
 
-				// Session 2 has highest stars
-				require.NotNil(t, result.Stars)
-				require.Equal(t, int64(10000), result.Stars.End.Experience)
+				// Session 2 has highest stars delta (9300 exp gain)
+				starsDiff := result.Stars.End.Experience - result.Stars.Start.Experience
+				require.Equal(t, int64(9300), starsDiff)
 			}
 
-			// For empty sessions
+			// For empty sessions - should return zero value struct
 			if tt.name == "empty sessions" {
-				require.Nil(t, result.Playtime)
-				require.Nil(t, result.FinalKills)
-				require.Nil(t, result.Wins)
-				require.Nil(t, result.FKDR)
-				require.Nil(t, result.Stars)
+				require.Equal(t, domain.BestSessions{}, result)
 			}
 
 			// For comprehensive metric test
 			if tt.name == "comprehensive metric test" {
 				// Session 0 has best playtime (5 hours)
-				require.NotNil(t, result.Playtime)
 				require.Equal(t, 5*time.Hour, result.Playtime.End.QueriedAt.Sub(result.Playtime.Start.QueriedAt))
 
 				// Session 1 has best final kills (50)
-				require.NotNil(t, result.FinalKills)
 				fkDiff := result.FinalKills.End.Overall.FinalKills - result.FinalKills.Start.Overall.FinalKills
 				require.Equal(t, 50, fkDiff)
 
 				// Session 1 has best wins (10)
-				require.NotNil(t, result.Wins)
 				winsDiff := result.Wins.End.Overall.Wins - result.Wins.Start.Overall.Wins
 				require.Equal(t, 10, winsDiff)
 
 				// Session 2 has best FKDR (20/1 = 20.0)
-				require.NotNil(t, result.FKDR)
 				fkdrFk := result.FKDR.End.Overall.FinalKills - result.FKDR.Start.Overall.FinalKills
 				fkdrFd := result.FKDR.End.Overall.FinalDeaths - result.FKDR.Start.Overall.FinalDeaths
 				fkdr := float64(fkdrFk) / float64(fkdrFd)
 				require.InDelta(t, 20.0, fkdr, 0.01)
 
-				// Session 2 has highest stars
-				require.NotNil(t, result.Stars)
-				require.Equal(t, int64(50000), result.Stars.End.Experience)
+				// Session 2 has best stars delta (49300 exp gain)
+				starsDiff := result.Stars.End.Experience - result.Stars.Start.Experience
+				require.Equal(t, int64(49300), starsDiff)
 			}
 		})
 	}

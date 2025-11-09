@@ -8,9 +8,9 @@ type Session struct {
 
 // BestSessions holds the best session for each metric
 type BestSessions struct {
-	Playtime   *Session
-	FinalKills *Session
-	Wins       *Session
-	FKDR       *Session
-	Stars      *Session
+	Playtime   Session
+	FinalKills Session
+	Wins       Session
+	FKDR       Session
+	Stars      Session
 }
