@@ -264,8 +264,9 @@ func TestBuildGetBestSessions(t *testing.T) {
 		getSessionsErr error
 	}{
 		{
-			name:     "empty sessions",
-			sessions: []domain.Session{},
+			name:           "empty sessions",
+			sessions:       []domain.Session{},
+			expectedErrMsg: "no sessions found",
 		},
 		{
 			name: "single session",
@@ -475,11 +476,6 @@ func TestBuildGetBestSessions(t *testing.T) {
 				// Session 2 has highest stars delta (9300 exp gain)
 				starsDiff := result.Stars.End.Experience - result.Stars.Start.Experience
 				require.Equal(t, int64(9300), starsDiff)
-			}
-
-			// For empty sessions - should return zero value struct
-			if tt.name == "empty sessions" {
-				require.Equal(t, domain.BestSessions{}, result)
 			}
 
 			// For comprehensive metric test

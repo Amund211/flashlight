@@ -1,6 +1,7 @@
 package app
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"time"
@@ -74,28 +75,52 @@ func BuildGetBestSessions(getSessions GetSessions) GetBestSessions {
 		}
 
 		if len(sessions) == 0 {
-			return domain.BestSessions{}, nil
+			return domain.BestSessions{}, domain.ErrNoSessions
+		}
+
+		// Temporary struct with pointers for efficient updates
+		type bestSessionsPointers struct {
+			Playtime   *domain.Session
+			FinalKills *domain.Session
+			Wins       *domain.Session
+			FKDR       *domain.Session
+			Stars      *domain.Session
 		}
 
 		// Initialize with first session
-		best := domain.BestSessions{
-			Playtime:   sessions[0],
-			FinalKills: sessions[0],
-			Wins:       sessions[0],
-			FKDR:       sessions[0],
-			Stars:      sessions[0],
+		best := bestSessionsPointers{
+			Playtime:   &sessions[0],
+			FinalKills: &sessions[0],
+			Wins:       &sessions[0],
+			FKDR:       &sessions[0],
+			Stars:      &sessions[0],
 		}
 
 		// Iterate through remaining sessions
 		for i := 1; i < len(sessions); i++ {
-			session := sessions[i]
-			best.Playtime = domain.GetBest(best.Playtime, session, domain.Session.Playtime)
-			best.FinalKills = domain.GetBest(best.FinalKills, session, domain.Session.FinalKills)
-			best.Wins = domain.GetBest(best.Wins, session, domain.Session.Wins)
-			best.FKDR = domain.GetBest(best.FKDR, session, domain.Session.FKDR)
-			best.Stars = domain.GetBest(best.Stars, session, domain.Session.Stars)
+			session := &sessions[i]
+			best.Playtime = getBest(best.Playtime, session, domain.Session.Playtime)
+			best.FinalKills = getBest(best.FinalKills, session, domain.Session.FinalKills)
+			best.Wins = getBest(best.Wins, session, domain.Session.Wins)
+			best.FKDR = getBest(best.FKDR, session, domain.Session.FKDR)
+			best.Stars = getBest(best.Stars, session, domain.Session.Stars)
 		}
 
-		return best, nil
+		// Convert to domain.BestSessions
+		return domain.BestSessions{
+			Playtime:   *best.Playtime,
+			FinalKills: *best.FinalKills,
+			Wins:       *best.Wins,
+			FKDR:       *best.FKDR,
+			Stars:      *best.Stars,
+		}, nil
 	}
+}
+
+// getBest returns the best session based on a comparison function that returns a cmp.Ordered value
+func getBest[T cmp.Ordered](current *domain.Session, candidate *domain.Session, getValue func(domain.Session) T) *domain.Session {
+	if getValue(*candidate) > getValue(*current) {
+		return candidate
+	}
+	return current
 }

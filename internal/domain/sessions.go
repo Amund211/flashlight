@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"cmp"
 	"time"
 )
 
@@ -50,12 +49,4 @@ type BestSessions struct {
 	Wins       Session
 	FKDR       Session
 	Stars      Session
-}
-
-// GetBest returns the best session based on a comparison function that returns a cmp.Ordered value
-func GetBest[T cmp.Ordered](current Session, candidate Session, getValue func(Session) T) Session {
-	if getValue(candidate) > getValue(current) {
-		return candidate
-	}
-	return current
 }
