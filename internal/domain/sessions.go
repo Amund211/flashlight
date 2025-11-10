@@ -41,12 +41,3 @@ func (s Session) FKDR() float64 {
 func (s Session) Stars() float64 {
 	return s.End.Stars() - s.Start.Stars()
 }
-
-// BestSessions holds the best session for each metric
-type BestSessions struct {
-	Playtime   Session
-	FinalKills Session
-	Wins       Session
-	FKDR       Session
-	Stars      Session
-}

@@ -62,20 +62,29 @@ type GetBestSessions = func(
 	ctx context.Context,
 	uuid string,
 	start, end time.Time,
-) (domain.BestSessions, error)
+) (StatsByMetric, error)
+
+// StatsByMetric holds the best session for each metric
+type StatsByMetric struct {
+	Playtime   domain.Session
+	FinalKills domain.Session
+	Wins       domain.Session
+	FKDR       domain.Session
+	Stars      domain.Session
+}
 
 func BuildGetBestSessions(getSessions GetSessions) GetBestSessions {
 	return func(ctx context.Context,
 		uuid string,
 		start, end time.Time,
-	) (domain.BestSessions, error) {
+	) (StatsByMetric, error) {
 		sessions, err := getSessions(ctx, uuid, start, end)
 		if err != nil {
-			return domain.BestSessions{}, err
+			return StatsByMetric{}, err
 		}
 
 		if len(sessions) == 0 {
-			return domain.BestSessions{}, domain.ErrNoSessions
+			return StatsByMetric{}, domain.ErrNoSessions
 		}
 
 		// Temporary struct with pointers for efficient updates
@@ -106,8 +115,8 @@ func BuildGetBestSessions(getSessions GetSessions) GetBestSessions {
 			best.Stars = getBest(best.Stars, session, domain.Session.Stars)
 		}
 
-		// Convert to domain.BestSessions
-		return domain.BestSessions{
+		// Convert to StatsByMetric
+		return StatsByMetric{
 			Playtime:   *best.Playtime,
 			FinalKills: *best.FinalKills,
 			Wins:       *best.Wins,
