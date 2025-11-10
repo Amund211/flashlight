@@ -257,173 +257,195 @@ func TestBuildGetBestSessions(t *testing.T) {
 	uuid := "12345678-1234-1234-1234-123456789012"
 	now := time.Now()
 
+	singleSession := domain.Session{
+		Start: domaintest.NewPlayerBuilder(uuid, now).
+			WithExperience(500).
+			WithOverallStats(domaintest.NewStatsBuilder().
+				WithGamesPlayed(10).
+				WithFinalKills(20).
+				Build()).
+			Build(),
+		End: domaintest.NewPlayerBuilder(uuid, now.Add(1*time.Hour)).
+			WithExperience(1000).
+			WithOverallStats(domaintest.NewStatsBuilder().
+				WithGamesPlayed(15).
+				WithFinalKills(30).
+				Build()).
+			Build(),
+		Consecutive: true,
+	}
+
+	multiSession0 := domain.Session{
+		Start: domaintest.NewPlayerBuilder(uuid, now).
+			WithExperience(500).
+			WithOverallStats(domaintest.NewStatsBuilder().
+				WithGamesPlayed(10).
+				WithFinalKills(20).
+				Build()).
+			Build(),
+		End: domaintest.NewPlayerBuilder(uuid, now.Add(3*time.Hour)).
+			WithExperience(600).
+			WithOverallStats(domaintest.NewStatsBuilder().
+				WithGamesPlayed(11).
+				WithFinalKills(21).
+				Build()).
+			Build(),
+		Consecutive: true,
+	}
+
+	multiSession1 := domain.Session{
+		Start: domaintest.NewPlayerBuilder(uuid, now.Add(4*time.Hour)).
+			WithExperience(600).
+			WithOverallStats(domaintest.NewStatsBuilder().
+				WithGamesPlayed(11).
+				WithFinalKills(21).
+				Build()).
+			Build(),
+		End: domaintest.NewPlayerBuilder(uuid, now.Add(5*time.Hour)).
+			WithExperience(700).
+			WithOverallStats(domaintest.NewStatsBuilder().
+				WithGamesPlayed(16).
+				WithFinalKills(41).
+				Build()).
+			Build(),
+		Consecutive: true,
+	}
+
+	multiSession2 := domain.Session{
+		Start: domaintest.NewPlayerBuilder(uuid, now.Add(6*time.Hour)).
+			WithExperience(700).
+			WithOverallStats(domaintest.NewStatsBuilder().
+				WithGamesPlayed(16).
+				WithFinalKills(41).
+				Build()).
+			Build(),
+		End: domaintest.NewPlayerBuilder(uuid, now.Add(7*time.Hour)).
+			WithExperience(10000).
+			WithOverallStats(domaintest.NewStatsBuilder().
+				WithGamesPlayed(17).
+				WithFinalKills(42).
+				Build()).
+			Build(),
+		Consecutive: true,
+	}
+
+	compSession0 := domain.Session{
+		Start: domaintest.NewPlayerBuilder(uuid, now).
+			WithExperience(500).
+			WithOverallStats(domaintest.NewStatsBuilder().
+				WithGamesPlayed(10).
+				WithFinalKills(100).
+				WithFinalDeaths(50).
+				WithWins(5).
+				Build()).
+			Build(),
+		End: domaintest.NewPlayerBuilder(uuid, now.Add(5*time.Hour)).
+			WithExperience(600).
+			WithOverallStats(domaintest.NewStatsBuilder().
+				WithGamesPlayed(15).
+				WithFinalKills(110).
+				WithFinalDeaths(60).
+				WithWins(7).
+				Build()).
+			Build(),
+		Consecutive: true,
+	}
+
+	compSession1 := domain.Session{
+		Start: domaintest.NewPlayerBuilder(uuid, now.Add(6*time.Hour)).
+			WithExperience(600).
+			WithOverallStats(domaintest.NewStatsBuilder().
+				WithGamesPlayed(15).
+				WithFinalKills(110).
+				WithFinalDeaths(60).
+				WithWins(7).
+				Build()).
+			Build(),
+		End: domaintest.NewPlayerBuilder(uuid, now.Add(7*time.Hour)).
+			WithExperience(700).
+			WithOverallStats(domaintest.NewStatsBuilder().
+				WithGamesPlayed(25).
+				WithFinalKills(160).
+				WithFinalDeaths(65).
+				WithWins(17).
+				Build()).
+			Build(),
+		Consecutive: true,
+	}
+
+	compSession2 := domain.Session{
+		Start: domaintest.NewPlayerBuilder(uuid, now.Add(8*time.Hour)).
+			WithExperience(700).
+			WithOverallStats(domaintest.NewStatsBuilder().
+				WithGamesPlayed(25).
+				WithFinalKills(160).
+				WithFinalDeaths(65).
+				WithWins(17).
+				Build()).
+			Build(),
+		End: domaintest.NewPlayerBuilder(uuid, now.Add(9*time.Hour)).
+			WithExperience(50000).
+			WithOverallStats(domaintest.NewStatsBuilder().
+				WithGamesPlayed(30).
+				WithFinalKills(180).
+				WithFinalDeaths(66).
+				WithWins(20).
+				Build()).
+			Build(),
+		Consecutive: true,
+	}
+
 	tests := []struct {
 		name           string
 		sessions       []domain.Session
+		expectedResult app.StatsByMetric
 		expectedErrMsg string
 		getSessionsErr error
 	}{
 		{
 			name:           "empty sessions",
 			sessions:       []domain.Session{},
+			expectedResult: app.StatsByMetric{},
 			expectedErrMsg: "no sessions found",
 		},
 		{
-			name: "single session",
-			sessions: []domain.Session{
-				{
-					Start: domaintest.NewPlayerBuilder(uuid, now).
-						WithExperience(500).
-						WithOverallStats(domaintest.NewStatsBuilder().
-							WithGamesPlayed(10).
-							WithFinalKills(20).
-							Build()).
-						Build(),
-					End: domaintest.NewPlayerBuilder(uuid, now.Add(1*time.Hour)).
-						WithExperience(1000).
-						WithOverallStats(domaintest.NewStatsBuilder().
-							WithGamesPlayed(15).
-							WithFinalKills(30).
-							Build()).
-						Build(),
-					Consecutive: true,
-				},
+			name:     "single session",
+			sessions: []domain.Session{singleSession},
+			expectedResult: app.StatsByMetric{
+				Playtime:   singleSession,
+				FinalKills: singleSession,
+				Wins:       singleSession,
+				FKDR:       singleSession,
+				Stars:      singleSession,
 			},
 		},
 		{
-			name: "multiple sessions with different bests",
-			sessions: []domain.Session{
-				// Session 0: Best playtime (3 hours)
-				{
-					Start: domaintest.NewPlayerBuilder(uuid, now).
-						WithExperience(500).
-						WithOverallStats(domaintest.NewStatsBuilder().
-							WithGamesPlayed(10).
-							WithFinalKills(20).
-							Build()).
-						Build(),
-					End: domaintest.NewPlayerBuilder(uuid, now.Add(3*time.Hour)).
-						WithExperience(600).
-						WithOverallStats(domaintest.NewStatsBuilder().
-							WithGamesPlayed(11).
-							WithFinalKills(21).
-							Build()).
-						Build(),
-					Consecutive: true,
-				},
-				// Session 1: Best final kills (20)
-				{
-					Start: domaintest.NewPlayerBuilder(uuid, now.Add(4*time.Hour)).
-						WithExperience(600).
-						WithOverallStats(domaintest.NewStatsBuilder().
-							WithGamesPlayed(11).
-							WithFinalKills(21).
-							Build()).
-						Build(),
-					End: domaintest.NewPlayerBuilder(uuid, now.Add(5*time.Hour)).
-						WithExperience(700).
-						WithOverallStats(domaintest.NewStatsBuilder().
-							WithGamesPlayed(16).
-							WithFinalKills(41).
-							Build()).
-						Build(),
-					Consecutive: true,
-				},
-				// Session 2: Best stars delta (9300 exp gain)
-				{
-					Start: domaintest.NewPlayerBuilder(uuid, now.Add(6*time.Hour)).
-						WithExperience(700).
-						WithOverallStats(domaintest.NewStatsBuilder().
-							WithGamesPlayed(16).
-							WithFinalKills(41).
-							Build()).
-						Build(),
-					End: domaintest.NewPlayerBuilder(uuid, now.Add(7*time.Hour)).
-						WithExperience(10000).
-						WithOverallStats(domaintest.NewStatsBuilder().
-							WithGamesPlayed(17).
-							WithFinalKills(42).
-							Build()).
-						Build(),
-					Consecutive: true,
-				},
+			name:     "multiple sessions with different bests",
+			sessions: []domain.Session{multiSession0, multiSession1, multiSession2},
+			expectedResult: app.StatsByMetric{
+				Playtime:   multiSession0, // 3 hours
+				FinalKills: multiSession1, // 20 final kills
+				Wins:       multiSession0, // 0 wins (first with 0)
+				FKDR:       multiSession1, // 20/0 = infinite (treated as 20)
+				Stars:      multiSession2, // 9300 exp gain
 			},
 		},
 		{
 			name:           "error from getSessions",
 			sessions:       nil,
 			getSessionsErr: assert.AnError,
+			expectedResult: app.StatsByMetric{},
 			expectedErrMsg: "assert.AnError",
 		},
 		{
-			name: "comprehensive metric test",
-			sessions: []domain.Session{
-				// Session 0: Best playtime (5 hours)
-				{
-					Start: domaintest.NewPlayerBuilder(uuid, now).
-						WithExperience(500).
-						WithOverallStats(domaintest.NewStatsBuilder().
-							WithGamesPlayed(10).
-							WithFinalKills(100).
-							WithFinalDeaths(50).
-							WithWins(5).
-							Build()).
-						Build(),
-					End: domaintest.NewPlayerBuilder(uuid, now.Add(5*time.Hour)).
-						WithExperience(600).
-						WithOverallStats(domaintest.NewStatsBuilder().
-							WithGamesPlayed(15).
-							WithFinalKills(110).
-							WithFinalDeaths(60).
-							WithWins(7).
-							Build()).
-						Build(),
-					Consecutive: true,
-				},
-				// Session 1: Best final kills (50) and best wins (10)
-				{
-					Start: domaintest.NewPlayerBuilder(uuid, now.Add(6*time.Hour)).
-						WithExperience(600).
-						WithOverallStats(domaintest.NewStatsBuilder().
-							WithGamesPlayed(15).
-							WithFinalKills(110).
-							WithFinalDeaths(60).
-							WithWins(7).
-							Build()).
-						Build(),
-					End: domaintest.NewPlayerBuilder(uuid, now.Add(7*time.Hour)).
-						WithExperience(700).
-						WithOverallStats(domaintest.NewStatsBuilder().
-							WithGamesPlayed(25).
-							WithFinalKills(160).
-							WithFinalDeaths(65).
-							WithWins(17).
-							Build()).
-						Build(),
-					Consecutive: true,
-				},
-				// Session 2: Best FKDR (20/1 = 20.0) and best stars delta (49300 exp gain)
-				{
-					Start: domaintest.NewPlayerBuilder(uuid, now.Add(8*time.Hour)).
-						WithExperience(700).
-						WithOverallStats(domaintest.NewStatsBuilder().
-							WithGamesPlayed(25).
-							WithFinalKills(160).
-							WithFinalDeaths(65).
-							WithWins(17).
-							Build()).
-						Build(),
-					End: domaintest.NewPlayerBuilder(uuid, now.Add(9*time.Hour)).
-						WithExperience(50000).
-						WithOverallStats(domaintest.NewStatsBuilder().
-							WithGamesPlayed(30).
-							WithFinalKills(180).
-							WithFinalDeaths(66).
-							WithWins(20).
-							Build()).
-						Build(),
-					Consecutive: true,
-				},
+			name:     "comprehensive metric test",
+			sessions: []domain.Session{compSession0, compSession1, compSession2},
+			expectedResult: app.StatsByMetric{
+				Playtime:   compSession0, // 5 hours
+				FinalKills: compSession1, // 50 final kills
+				Wins:       compSession1, // 10 wins
+				FKDR:       compSession2, // 20/1 = 20.0
+				Stars:      compSession2, // 49300 exp gain
 			},
 		},
 	}
@@ -454,53 +476,7 @@ func TestBuildGetBestSessions(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-
-			// For single session test, all best sessions should be the same session
-			if tt.name == "single session" {
-				// All should be the same session
-				require.Equal(t, result.Playtime, result.FinalKills)
-				require.Equal(t, result.Playtime, result.Wins)
-				require.Equal(t, result.Playtime, result.FKDR)
-				require.Equal(t, result.Playtime, result.Stars)
-			}
-
-			// For multiple sessions test, verify the correct bests
-			if tt.name == "multiple sessions with different bests" {
-				// Session 0 has most playtime (3 hours)
-				require.Equal(t, 3*time.Hour, result.Playtime.End.QueriedAt.Sub(result.Playtime.Start.QueriedAt))
-
-				// Session 1 has most final kills (20)
-				fkDiff := result.FinalKills.End.Overall.FinalKills - result.FinalKills.Start.Overall.FinalKills
-				require.Equal(t, 20, fkDiff)
-
-				// Session 2 has highest stars delta (9300 exp gain)
-				starsDiff := result.Stars.End.Experience - result.Stars.Start.Experience
-				require.Equal(t, int64(9300), starsDiff)
-			}
-
-			// For comprehensive metric test
-			if tt.name == "comprehensive metric test" {
-				// Session 0 has best playtime (5 hours)
-				require.Equal(t, 5*time.Hour, result.Playtime.End.QueriedAt.Sub(result.Playtime.Start.QueriedAt))
-
-				// Session 1 has best final kills (50)
-				fkDiff := result.FinalKills.End.Overall.FinalKills - result.FinalKills.Start.Overall.FinalKills
-				require.Equal(t, 50, fkDiff)
-
-				// Session 1 has best wins (10)
-				winsDiff := result.Wins.End.Overall.Wins - result.Wins.Start.Overall.Wins
-				require.Equal(t, 10, winsDiff)
-
-				// Session 2 has best FKDR (20/1 = 20.0)
-				fkdrFk := result.FKDR.End.Overall.FinalKills - result.FKDR.Start.Overall.FinalKills
-				fkdrFd := result.FKDR.End.Overall.FinalDeaths - result.FKDR.Start.Overall.FinalDeaths
-				fkdr := float64(fkdrFk) / float64(fkdrFd)
-				require.InDelta(t, 20.0, fkdr, 0.01)
-
-				// Session 2 has best stars delta (49300 exp gain)
-				starsDiff := result.Stars.End.Experience - result.Stars.Start.Experience
-				require.Equal(t, int64(49300), starsDiff)
-			}
+			require.Equal(t, tt.expectedResult, result)
 		})
 	}
 }
