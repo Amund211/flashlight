@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -75,6 +76,7 @@ func BuildGetAndPersistPlayerWithCache(
 	type trackingInfo struct {
 		cached       bool
 		success      bool
+		found        bool
 		invalidInput bool
 	}
 
@@ -105,11 +107,15 @@ func BuildGetAndPersistPlayerWithCache(
 		if err != nil {
 			// NOTE: GetOrCreate only returns an error if create() fails.
 			// getAndPersistPlayerWithoutCache handles its own error reporting
-			track(ctx, trackingInfo{success: false})
+			if errors.Is(err, domain.ErrPlayerNotFound) {
+				track(ctx, trackingInfo{success: true, found: false})
+			} else {
+				track(ctx, trackingInfo{success: false})
+			}
 			return nil, fmt.Errorf("failed to cache.GetOrCreate player data: %w", err)
 		}
 
-		track(ctx, trackingInfo{success: true, cached: !created})
+		track(ctx, trackingInfo{success: true, found: true, cached: !created})
 		return player, nil
 	}, nil
 }
