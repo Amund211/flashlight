@@ -85,6 +85,7 @@ func BuildGetAndPersistPlayerWithCache(
 			ctx,
 			1,
 			metric.WithAttributes(
+				attribute.Bool("found", info.found),
 				attribute.Bool("cached", info.cached),
 				attribute.Bool("success", info.success),
 				attribute.Bool("invalid_input", info.invalidInput),
