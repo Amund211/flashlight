@@ -180,6 +180,20 @@ func MakeGetWrappedHandler(
 	return middleware(handler)
 }
 
+func calculateSessionStats(start, end domain.GamemodeStatsPIT) wrappedStats {
+	return wrappedStats{
+		GamesPlayed: end.GamesPlayed - start.GamesPlayed,
+		Wins:        end.Wins - start.Wins,
+		Losses:      end.Losses - start.Losses,
+		BedsBroken:  end.BedsBroken - start.BedsBroken,
+		BedsLost:    end.BedsLost - start.BedsLost,
+		FinalKills:  end.FinalKills - start.FinalKills,
+		FinalDeaths: end.FinalDeaths - start.FinalDeaths,
+		Kills:       end.Kills - start.Kills,
+		Deaths:      end.Deaths - start.Deaths,
+	}
+}
+
 func computeWrappedStats(sessions []domain.Session, year int) wrappedResponse {
 	response := wrappedResponse{
 		Year:          year,
@@ -204,20 +218,7 @@ func computeWrappedStats(sessions []domain.Session, year int) wrappedResponse {
 		session := &sessions[i]
 
 		// Calculate stats delta for this session
-		statsStart := session.Start.Overall
-		statsEnd := session.End.Overall
-
-		sessionStats := wrappedStats{
-			GamesPlayed: statsEnd.GamesPlayed - statsStart.GamesPlayed,
-			Wins:        statsEnd.Wins - statsStart.Wins,
-			Losses:      statsEnd.Losses - statsStart.Losses,
-			BedsBroken:  statsEnd.BedsBroken - statsStart.BedsBroken,
-			BedsLost:    statsEnd.BedsLost - statsStart.BedsLost,
-			FinalKills:  statsEnd.FinalKills - statsStart.FinalKills,
-			FinalDeaths: statsEnd.FinalDeaths - statsStart.FinalDeaths,
-			Kills:       statsEnd.Kills - statsStart.Kills,
-			Deaths:      statsEnd.Deaths - statsStart.Deaths,
-		}
+		sessionStats := calculateSessionStats(session.Start.Overall, session.End.Overall)
 
 		// Add to totals
 		totalStats.GamesPlayed += sessionStats.GamesPlayed
@@ -251,19 +252,7 @@ func computeWrappedStats(sessions []domain.Session, year int) wrappedResponse {
 
 	// Create longest session summary
 	if longestSession != nil {
-		statsStart := longestSession.Start.Overall
-		statsEnd := longestSession.End.Overall
-		sessionStats := wrappedStats{
-			GamesPlayed: statsEnd.GamesPlayed - statsStart.GamesPlayed,
-			Wins:        statsEnd.Wins - statsStart.Wins,
-			Losses:      statsEnd.Losses - statsStart.Losses,
-			BedsBroken:  statsEnd.BedsBroken - statsStart.BedsBroken,
-			BedsLost:    statsEnd.BedsLost - statsStart.BedsLost,
-			FinalKills:  statsEnd.FinalKills - statsStart.FinalKills,
-			FinalDeaths: statsEnd.FinalDeaths - statsStart.FinalDeaths,
-			Kills:       statsEnd.Kills - statsStart.Kills,
-			Deaths:      statsEnd.Deaths - statsStart.Deaths,
-		}
+		sessionStats := calculateSessionStats(longestSession.Start.Overall, longestSession.End.Overall)
 
 		response.LongestSession = &wrappedSessionSummary{
 			Start:    longestSession.Start.QueriedAt,
@@ -275,19 +264,7 @@ func computeWrappedStats(sessions []domain.Session, year int) wrappedResponse {
 
 	// Create highest FKDR session summary
 	if highestFKDRSession != nil {
-		statsStart := highestFKDRSession.Start.Overall
-		statsEnd := highestFKDRSession.End.Overall
-		sessionStats := wrappedStats{
-			GamesPlayed: statsEnd.GamesPlayed - statsStart.GamesPlayed,
-			Wins:        statsEnd.Wins - statsStart.Wins,
-			Losses:      statsEnd.Losses - statsStart.Losses,
-			BedsBroken:  statsEnd.BedsBroken - statsStart.BedsBroken,
-			BedsLost:    statsEnd.BedsLost - statsStart.BedsLost,
-			FinalKills:  statsEnd.FinalKills - statsStart.FinalKills,
-			FinalDeaths: statsEnd.FinalDeaths - statsStart.FinalDeaths,
-			Kills:       statsEnd.Kills - statsStart.Kills,
-			Deaths:      statsEnd.Deaths - statsStart.Deaths,
-		}
+		sessionStats := calculateSessionStats(highestFKDRSession.Start.Overall, highestFKDRSession.End.Overall)
 
 		duration := highestFKDRSession.End.QueriedAt.Sub(highestFKDRSession.Start.QueriedAt)
 
