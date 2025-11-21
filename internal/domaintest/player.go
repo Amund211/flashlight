@@ -61,6 +61,16 @@ func (sb *statsBuilder) WithFinalKills(finalKills int) *statsBuilder {
 	return sb
 }
 
+func (sb *statsBuilder) WithFinalDeaths(finalDeaths int) *statsBuilder {
+	sb.stats.FinalDeaths = finalDeaths
+	return sb
+}
+
+func (sb *statsBuilder) WithWins(wins int) *statsBuilder {
+	sb.stats.Wins = wins
+	return sb
+}
+
 func (sb *statsBuilder) Build() domain.GamemodeStatsPIT {
 	return *sb.stats
 }
