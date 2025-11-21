@@ -147,7 +147,7 @@ func TestMakeGetWrappedHandler(t *testing.T) {
 		require.NotNil(t, longestSession)
 		require.Equal(t, 5.0, longestSession["durationHours"])
 
-		// Verify highest FKDR (session2 has 20/1 = 20 FKDR)
+		// Verify highest FKDR (session2 has delta of 20 final kills and 1 final death: 20/1 = 20 FKDR)
 		highestFKDR := response["highestFKDR"].(map[string]interface{})
 		require.NotNil(t, highestFKDR)
 		require.Equal(t, 20.0, highestFKDR["fkdr"])
