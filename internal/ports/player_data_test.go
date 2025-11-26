@@ -33,6 +33,10 @@ func TestMakeGetPlayerDataHandler(t *testing.T) {
 		return domain.Tags{}, nil
 	}
 
+	getAccountByUsername := func(ctx context.Context, username string) (domain.Account, error) {
+		return domain.Account{}, nil
+	}
+
 	t.Run("success", func(t *testing.T) {
 		t.Parallel()
 
@@ -40,7 +44,7 @@ func TestMakeGetPlayerDataHandler(t *testing.T) {
 
 		getPlayerDataHandler := MakeGetPlayerDataHandler(func(ctx context.Context, uuid string) (*domain.PlayerPIT, error) {
 			return player, nil
-		}, getTags, logger, sentryMiddleware)
+		}, getTags, getAccountByUsername, logger, sentryMiddleware)
 
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, target, nil)
@@ -64,7 +68,7 @@ func TestMakeGetPlayerDataHandler(t *testing.T) {
 			t.Helper()
 			t.Fatal("should not be called")
 			return nil, nil
-		}, getTags, logger, sentryMiddleware)
+		}, getTags, getAccountByUsername, logger, sentryMiddleware)
 		w := httptest.NewRecorder()
 
 		req := httptest.NewRequest(http.MethodGet, "/?uuid=1234-1234-1234", nil)
@@ -82,7 +86,7 @@ func TestMakeGetPlayerDataHandler(t *testing.T) {
 
 		getPlayerDataHandler := MakeGetPlayerDataHandler(func(ctx context.Context, uuid string) (*domain.PlayerPIT, error) {
 			return nil, fmt.Errorf("%w: couldn't find him", domain.ErrPlayerNotFound)
-		}, getTags, logger, sentryMiddleware)
+		}, getTags, getAccountByUsername, logger, sentryMiddleware)
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, target, nil)
 
@@ -99,7 +103,7 @@ func TestMakeGetPlayerDataHandler(t *testing.T) {
 
 		getPlayerDataHandler := MakeGetPlayerDataHandler(func(ctx context.Context, uuid string) (*domain.PlayerPIT, error) {
 			return nil, fmt.Errorf("error :^(: (%w)", domain.ErrTemporarilyUnavailable)
-		}, getTags, logger, sentryMiddleware)
+		}, getTags, getAccountByUsername, logger, sentryMiddleware)
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, target, nil)
 
@@ -118,7 +122,7 @@ func TestMakeGetPlayerDataHandler(t *testing.T) {
 
 		getPlayerDataHandler := MakeGetPlayerDataHandler(func(ctx context.Context, uuid string) (*domain.PlayerPIT, error) {
 			return player, nil
-		}, getTags, logger, sentryMiddleware)
+		}, getTags, getAccountByUsername, logger, sentryMiddleware)
 
 		// Exhaust the rate limit
 		for range 200 {
