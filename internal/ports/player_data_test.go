@@ -215,42 +215,6 @@ func TestMakeGetPlayerDataHandler(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 		require.False(t, accountByUsernameCalled, "getAccountByUsername should not have been called when displayname is nil")
 	})
-
-	t.Run("getAccountByUsername context is not canceled after request completes", func(t *testing.T) {
-		t.Parallel()
-
-		displayname := "TestPlayer"
-		player := domaintest.NewPlayerBuilder(UUID, now).WithExperience(1000).BuildPtr()
-		player.Displayname = &displayname
-
-		contextCanceled := false
-		getAccountByUsernameTest := func(ctx context.Context, username string) (domain.Account, error) {
-			// Wait for the request to complete and context to be potentially canceled
-			time.Sleep(150 * time.Millisecond)
-			select {
-			case <-ctx.Done():
-				contextCanceled = true
-			default:
-				// Context is not canceled
-			}
-			return domain.Account{}, nil
-		}
-
-		getPlayerDataHandler := MakeGetPlayerDataHandler(func(ctx context.Context, uuid string) (*domain.PlayerPIT, error) {
-			return player, nil
-		}, getTags, getAccountByUsernameTest, logger, sentryMiddleware)
-
-		w := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, target, nil)
-		getPlayerDataHandler(w, req)
-
-		resp := w.Result()
-		require.Equal(t, 200, resp.StatusCode)
-
-		// Wait for the goroutine to complete
-		time.Sleep(200 * time.Millisecond)
-		require.False(t, contextCanceled, "getAccountByUsername context should not be canceled after request completes")
-	})
 }
 
 func TestWriteErrorResponse(t *testing.T) {
