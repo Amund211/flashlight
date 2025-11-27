@@ -7,19 +7,19 @@ import (
 	"github.com/jellydator/ttlcache/v3"
 )
 
-type tllCacheEntry[T any] struct {
+type ttlCacheEntry[T any] struct {
 	data  T
 	valid bool
 }
 
 type ttlCache[T any] struct {
-	cache       *ttlcache.Cache[string, tllCacheEntry[T]]
+	cache       *ttlcache.Cache[string, ttlCacheEntry[T]]
 	notifyChans map[string]chan struct{}
 	lock        sync.Mutex
 }
 
 func (c *ttlCache[T]) getOrClaim(key string) hitResult[T] {
-	invalid := tllCacheEntry[T]{valid: false}
+	invalid := ttlCacheEntry[T]{valid: false}
 	item, existed := c.cache.GetOrSet(key, invalid)
 
 	c.lock.Lock()
@@ -47,7 +47,7 @@ func (c *ttlCache[T]) getOrClaim(key string) hitResult[T] {
 }
 
 func (c *ttlCache[T]) set(key string, data T) {
-	c.cache.Set(key, tllCacheEntry[T]{data: data, valid: true}, ttlcache.DefaultTTL)
+	c.cache.Set(key, ttlCacheEntry[T]{data: data, valid: true}, ttlcache.DefaultTTL)
 
 	c.lock.Lock()
 	// Close and delete notification channel while holding lock
@@ -71,9 +71,9 @@ func (c *ttlCache[T]) delete(key string) {
 }
 
 func NewTTLCache[T any](ttl time.Duration) Cache[T] {
-	cache := ttlcache.New[string, tllCacheEntry[T]](
-		ttlcache.WithTTL[string, tllCacheEntry[T]](ttl),
-		ttlcache.WithDisableTouchOnHit[string, tllCacheEntry[T]](),
+	cache := ttlcache.New[string, ttlCacheEntry[T]](
+		ttlcache.WithTTL[string, ttlCacheEntry[T]](ttl),
+		ttlcache.WithDisableTouchOnHit[string, ttlCacheEntry[T]](),
 	)
 	go cache.Start()
 	return &ttlCache[T]{
