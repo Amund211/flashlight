@@ -58,18 +58,20 @@ func (cacheClient *mockCacheClient[T]) getOrClaim(uuid string) hitResult[T] {
 
 func (cacheClient *mockCacheClient[T]) set(uuid string, data T) {
 	cacheClient.server.cacheLock.Lock()
+	defer cacheClient.server.cacheLock.Unlock()
+
 	cacheClient.server.cache[uuid] = mockCacheServerEntry[T]{
 		data:       data,
 		valid:      true,
 		insertedAt: cacheClient.server.currentTick,
 	}
-	cacheClient.server.cacheLock.Unlock()
 }
 
 func (cacheClient *mockCacheClient[T]) delete(uuid string) {
 	cacheClient.server.cacheLock.Lock()
+	defer cacheClient.server.cacheLock.Unlock()
+
 	delete(cacheClient.server.cache, uuid)
-	cacheClient.server.cacheLock.Unlock()
 }
 
 // getWaitChan returns a channel that will be closed when a tick happens

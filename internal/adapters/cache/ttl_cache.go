@@ -15,40 +15,27 @@ type tllCacheEntry[T any] struct {
 type ttlCache[T any] struct {
 	cache       *ttlcache.Cache[string, tllCacheEntry[T]]
 	notifyChans map[string]chan struct{}
-	notifyLock  sync.Mutex
-}
-
-func (c *ttlCache[T]) getNotifyChan(key string) <-chan struct{} {
-	c.notifyLock.Lock()
-	defer c.notifyLock.Unlock()
-
-	if ch, ok := c.notifyChans[key]; ok {
-		return ch
-	}
-
-	ch := make(chan struct{})
-	c.notifyChans[key] = ch
-	return ch
-}
-
-func (c *ttlCache[T]) closeNotifyChan(key string) {
-	c.notifyLock.Lock()
-	defer c.notifyLock.Unlock()
-
-	if ch, ok := c.notifyChans[key]; ok {
-		close(ch)
-		delete(c.notifyChans, key)
-	}
+	lock        sync.Mutex
 }
 
 func (c *ttlCache[T]) getOrClaim(key string) hitResult[T] {
 	invalid := tllCacheEntry[T]{valid: false}
 	item, existed := c.cache.GetOrSet(key, invalid)
 
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	var notifyChan <-chan struct{}
 	// Only create a wait channel if the value is not valid (waiting for another goroutine to populate it)
 	if existed && !item.Value().valid {
-		notifyChan = c.getNotifyChan(key)
+		// Create notification channel if it doesn't exist
+		if ch, exists := c.notifyChans[key]; exists {
+			notifyChan = ch
+		} else {
+			ch := make(chan struct{})
+			c.notifyChans[key] = ch
+			notifyChan = ch
+		}
 	}
 
 	return hitResult[T]{
@@ -61,12 +48,26 @@ func (c *ttlCache[T]) getOrClaim(key string) hitResult[T] {
 
 func (c *ttlCache[T]) set(key string, data T) {
 	c.cache.Set(key, tllCacheEntry[T]{data: data, valid: true}, ttlcache.DefaultTTL)
-	c.closeNotifyChan(key)
+
+	c.lock.Lock()
+	// Close and delete notification channel while holding lock
+	if ch, ok := c.notifyChans[key]; ok {
+		close(ch)
+		delete(c.notifyChans, key)
+	}
+	c.lock.Unlock()
 }
 
 func (c *ttlCache[T]) delete(key string) {
 	c.cache.Delete(key)
-	c.closeNotifyChan(key)
+
+	c.lock.Lock()
+	// Close and delete notification channel while holding lock
+	if ch, ok := c.notifyChans[key]; ok {
+		close(ch)
+		delete(c.notifyChans, key)
+	}
+	c.lock.Unlock()
 }
 
 func NewTTLCache[T any](ttl time.Duration) Cache[T] {
