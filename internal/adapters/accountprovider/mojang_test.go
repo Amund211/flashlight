@@ -205,9 +205,14 @@ func (m *batchMockedClient) Do(req *http.Request) (*http.Response, error) {
 	if req.Method == "POST" && req.URL.Path == "/profiles/minecraft" {
 		m.bulkRequests++
 		// Parse the request body to get usernames
-		body, _ := io.ReadAll(req.Body)
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
+			return nil, err
+		}
 		var usernames []string
-		json.Unmarshal(body, &usernames)
+		if err := json.Unmarshal(body, &usernames); err != nil {
+			return nil, err
+		}
 
 		// Return bulk response
 		responses := make([]map[string]string, 0, len(usernames))
@@ -218,7 +223,10 @@ func (m *batchMockedClient) Do(req *http.Request) (*http.Response, error) {
 				"name": username,
 			})
 		}
-		responseData, _ := json.Marshal(responses)
+		responseData, err := json.Marshal(responses)
+		if err != nil {
+			return nil, err
+		}
 		return &http.Response{
 			StatusCode: 200,
 			Body:       io.NopCloser(bytes.NewReader(responseData)),

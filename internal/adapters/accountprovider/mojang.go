@@ -176,6 +176,8 @@ func (m *Mojang) batchUUIDProcessor(afterFunc func(time.Duration) <-chan time.Ti
 
 // processBatchUsernames processes a batch of username requests
 func (m *Mojang) processBatchUsernames(batch []usernameRequest) {
+	// Use background context as batch processing runs independently of caller contexts
+	// Individual request contexts are not used here to avoid cancellation affecting the batch
 	ctx := context.Background()
 	ctx, span := m.tracer.Start(ctx, "Mojang.processBatchUsernames")
 	defer span.End()
@@ -214,6 +216,8 @@ func (m *Mojang) processBatchUsernames(batch []usernameRequest) {
 
 // processBatchUUIDs processes a batch of UUID requests
 func (m *Mojang) processBatchUUIDs(batch []uuidRequest) {
+	// Use background context as batch processing runs independently of caller contexts
+	// Individual request contexts are not used here to avoid cancellation affecting the batch
 	ctx := context.Background()
 	ctx, span := m.tracer.Start(ctx, "Mojang.processBatchUUIDs")
 	defer span.End()
