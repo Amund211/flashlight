@@ -19,36 +19,11 @@ type mockCacheServer[T any] struct {
 	maxTicks          int
 	numGoroutines     int
 	completedThisTick int
-	notifyChans       map[string]chan struct{}
-	notifyLock        sync.Mutex
 }
 
 type mockCacheClient[T any] struct {
 	server      *mockCacheServer[T]
 	desiredTick int
-}
-
-func (server *mockCacheServer[T]) getNotifyChan(key string) <-chan struct{} {
-	server.notifyLock.Lock()
-	defer server.notifyLock.Unlock()
-
-	if ch, ok := server.notifyChans[key]; ok {
-		return ch
-	}
-
-	ch := make(chan struct{})
-	server.notifyChans[key] = ch
-	return ch
-}
-
-func (server *mockCacheServer[T]) closeNotifyChan(key string) {
-	server.notifyLock.Lock()
-	defer server.notifyLock.Unlock()
-
-	if ch, ok := server.notifyChans[key]; ok {
-		close(ch)
-		delete(server.notifyChans, key)
-	}
 }
 
 func (cacheClient *mockCacheClient[T]) getOrClaim(uuid string) hitResult[T] {
@@ -89,16 +64,12 @@ func (cacheClient *mockCacheClient[T]) set(uuid string, data T) {
 		insertedAt: cacheClient.server.currentTick,
 	}
 	cacheClient.server.cacheLock.Unlock()
-
-	cacheClient.server.closeNotifyChan(uuid)
 }
 
 func (cacheClient *mockCacheClient[T]) delete(uuid string) {
 	cacheClient.server.cacheLock.Lock()
 	delete(cacheClient.server.cache, uuid)
 	cacheClient.server.cacheLock.Unlock()
-
-	cacheClient.server.closeNotifyChan(uuid)
 }
 
 // getWaitChan returns a channel that will be closed when a tick happens
@@ -171,7 +142,6 @@ func NewMockCacheServer[T any](numGoroutines int, maxTicks int) (*mockCacheServe
 		maxTicks:          maxTicks,
 		numGoroutines:     numGoroutines,
 		completedThisTick: 0,
-		notifyChans:       make(map[string]chan struct{}),
 	}
 
 	clients := make([]*mockCacheClient[T], numGoroutines)
