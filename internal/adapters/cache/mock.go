@@ -112,10 +112,18 @@ func (cacheClient *mockCacheClient[T]) getWaitChan() <-chan struct{} {
 	cacheClient.server.tickLock.Unlock()
 
 	cacheClient.desiredTick++
+	desiredTick := cacheClient.desiredTick // Capture the value for the closure
 
 	ch := make(chan struct{})
 	go func() {
-		for cacheClient.server.currentTick < cacheClient.desiredTick {
+		for {
+			cacheClient.server.tickLock.Lock()
+			currentTick := cacheClient.server.currentTick
+			cacheClient.server.tickLock.Unlock()
+
+			if currentTick >= desiredTick {
+				break
+			}
 			runtime.Gosched()
 		}
 		close(ch)
@@ -139,7 +147,11 @@ func (cacheServer *mockCacheServer[T]) isDone() bool {
 
 func (cacheServer *mockCacheServer[T]) processTicks() {
 	for !cacheServer.isDone() {
-		if cacheServer.completedThisTick != cacheServer.numGoroutines {
+		cacheServer.tickLock.Lock()
+		completed := cacheServer.completedThisTick
+		cacheServer.tickLock.Unlock()
+
+		if completed != cacheServer.numGoroutines {
 			runtime.Gosched()
 			continue
 		}
