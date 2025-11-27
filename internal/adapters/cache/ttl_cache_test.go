@@ -57,11 +57,4 @@ func TestTTLCache(t *testing.T) {
 		result := cache.getOrClaim("key")
 		require.True(t, result.claimed, "Expected to not find a value")
 	})
-
-	t.Run("wait", func(t *testing.T) {
-		t.Parallel()
-
-		cache := NewTTLCache[Data](1000 * time.Second)
-		cache.wait()
-	})
 }

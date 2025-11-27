@@ -45,7 +45,8 @@ func GetOrCreate[T any](ctx context.Context, cache Cache[T], key string, create 
 			return result.data, false, nil
 		}
 
+		// Wait for the entry to be populated by another goroutine
 		logging.FromContext(ctx).InfoContext(ctx, "Waiting for cache")
-		cache.wait()
+		<-result.notifyChan
 	}
 }
