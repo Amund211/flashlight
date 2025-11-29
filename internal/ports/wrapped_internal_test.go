@@ -11,7 +11,7 @@ import (
 
 func TestComputeSessionLengths(t *testing.T) {
 	ctx := context.Background()
-	
+
 	tests := []struct {
 		name     string
 		sessions []domain.Session
@@ -61,7 +61,7 @@ func TestComputeSessionLengths(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := computeSessionLengths(ctx, tt.sessions)
@@ -80,7 +80,7 @@ func TestComputeSessionLengths(t *testing.T) {
 
 func TestComputeSessionsPerMonth(t *testing.T) {
 	ctx := context.Background()
-	
+
 	tests := []struct {
 		name     string
 		sessions []domain.Session
@@ -106,7 +106,7 @@ func TestComputeSessionsPerMonth(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := computeSessionsPerMonth(ctx, tt.sessions)
@@ -117,7 +117,7 @@ func TestComputeSessionsPerMonth(t *testing.T) {
 
 func TestComputeFlawlessSessions(t *testing.T) {
 	ctx := context.Background()
-	
+
 	tests := []struct {
 		name     string
 		sessions []domain.Session
@@ -188,7 +188,7 @@ func TestComputeFlawlessSessions(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := computeFlawlessSessions(ctx, tt.sessions)
@@ -205,7 +205,7 @@ func TestComputeFlawlessSessions(t *testing.T) {
 
 func TestComputeAverages(t *testing.T) {
 	ctx := context.Background()
-	
+
 	tests := []struct {
 		name     string
 		sessions []domain.Session
@@ -262,14 +262,14 @@ func TestComputeAverages(t *testing.T) {
 				},
 			},
 			want: &averageStats{
-				SessionLength: 3.0,      // (2+4)/2
-				GamesPlayed:   15.0,     // (10+20)/2
-				Wins:          7.5,      // (5+10)/2
-				FinalKills:    30.0,     // (20+40)/2
+				SessionLength: 3.0,  // (2+4)/2
+				GamesPlayed:   15.0, // (10+20)/2
+				Wins:          7.5,  // (5+10)/2
+				FinalKills:    30.0, // (20+40)/2
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := computeAverages(ctx, tt.sessions)
@@ -288,7 +288,7 @@ func TestComputeAverages(t *testing.T) {
 
 func TestComputeYearBoundaryStats(t *testing.T) {
 	ctx := context.Background()
-	
+
 	tests := []struct {
 		name       string
 		playerPITs []domain.PlayerPIT
@@ -334,7 +334,7 @@ func TestComputeYearBoundaryStats(t *testing.T) {
 			wantEnd:   false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := computeYearBoundaryStats(ctx, tt.playerPITs, tt.year)
@@ -355,15 +355,15 @@ func TestComputeYearBoundaryStats(t *testing.T) {
 
 func TestComputeCoverage(t *testing.T) {
 	ctx := context.Background()
-	
+
 	tests := []struct {
-		name                  string
-		playerPITs            []domain.PlayerPIT
-		sessions              []domain.Session
-		year                  int
-		wantCoverageMin       float64
-		wantCoverageMax       float64
-		wantAdjustedHoursMin  float64
+		name                 string
+		playerPITs           []domain.PlayerPIT
+		sessions             []domain.Session
+		year                 int
+		wantCoverageMin      float64
+		wantCoverageMax      float64
+		wantAdjustedHoursMin float64
 	}{
 		{
 			name:                 "empty data",
@@ -404,7 +404,7 @@ func TestComputeCoverage(t *testing.T) {
 		// 	wantAdjustedHoursMin: 1.9,
 		// },
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := computeCoverage(ctx, tt.playerPITs, tt.sessions, tt.year)
