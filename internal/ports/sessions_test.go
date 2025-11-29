@@ -84,20 +84,22 @@ func TestMakeGetSessionsHandler(t *testing.T) {
 	uuid := "01234567-89ab-cdef-0123-456789abcdef"
 	start := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
 	startStr := "2023-01-01T00:00:00Z"
-	end := time.Date(2023, 1, 31, 23, 59, 59, 999999999, time.UTC)
-	endStr := "2023-01-31T23:59:59.999999999Z"
+	end := time.Date(2023, 1, 1, 1, 0, 0, 0, time.UTC)
+	endStr := "2023-01-01T01:00:00Z"
 	
 	// Create player PITs that will be returned by GetPlayerPITs
 	stats := []domain.PlayerPIT{
 		domaintest.NewPlayerBuilder(uuid, start).
 			WithExperience(500).
+			WithGamesPlayed(10).
 			WithOverallStats(
-				domaintest.NewStatsBuilder().WithFinalKills(10).Build(),
+				domaintest.NewStatsBuilder().WithGamesPlayed(10).WithFinalKills(10).Build(),
 			).FromDB().Build(),
 		domaintest.NewPlayerBuilder(uuid, end).
 			WithExperience(1000).
+			WithGamesPlayed(11).
 			WithOverallStats(
-				domaintest.NewStatsBuilder().WithFinalKills(11).Build(),
+				domaintest.NewStatsBuilder().WithGamesPlayed(11).WithFinalKills(11).Build(),
 			).FromDB().Build(),
 	}
 	
