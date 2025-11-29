@@ -18,29 +18,29 @@ import (
 )
 
 type wrappedResponse struct {
-	Success                  bool                      `json:"success"`
-	UUID                     string                    `json:"uuid,omitempty"`
-	Year                     int                       `json:"year,omitempty"`
-	TotalSessions            int                       `json:"totalSessions"`
-	NonConsecutiveSessions   int                       `json:"nonConsecutiveSessions"`
-	SessionLengths           *sessionLengthStats       `json:"sessionLengths,omitempty"`
-	SessionsPerMonth         map[int]int               `json:"sessionsPerMonth,omitempty"`
-	BestSessions             *bestSessionsStats        `json:"bestSessions,omitempty"`
-	Averages                 *averageStats             `json:"averages,omitempty"`
-	YearStats                *yearBoundaryStats        `json:"yearStats,omitempty"`
-	Winstreaks               *winstreakStats           `json:"winstreaks,omitempty"`
-	FinalKillStreaks         *finalKillStreakStats     `json:"finalKillStreaks,omitempty"`
-	SessionCoverage          *coverageStats            `json:"sessionCoverage,omitempty"`
-	FavoritePlayIntervals    []playIntervalStats       `json:"favoritePlayIntervals,omitempty"`
-	FlawlessSessions         *flawlessSessionStats     `json:"flawlessSessions,omitempty"`
-	Cause                    string                    `json:"cause,omitempty"`
+	Success                bool                  `json:"success"`
+	UUID                   string                `json:"uuid,omitempty"`
+	Year                   int                   `json:"year,omitempty"`
+	TotalSessions          int                   `json:"totalSessions"`
+	NonConsecutiveSessions int                   `json:"nonConsecutiveSessions"`
+	SessionLengths         *sessionLengthStats   `json:"sessionLengths,omitempty"`
+	SessionsPerMonth       map[int]int           `json:"sessionsPerMonth,omitempty"`
+	BestSessions           *bestSessionsStats    `json:"bestSessions,omitempty"`
+	Averages               *averageStats         `json:"averages,omitempty"`
+	YearStats              *yearBoundaryStats    `json:"yearStats,omitempty"`
+	Winstreaks             *winstreakStats       `json:"winstreaks,omitempty"`
+	FinalKillStreaks       *finalKillStreakStats `json:"finalKillStreaks,omitempty"`
+	SessionCoverage        *coverageStats        `json:"sessionCoverage,omitempty"`
+	FavoritePlayIntervals  []playIntervalStats   `json:"favoritePlayIntervals,omitempty"`
+	FlawlessSessions       *flawlessSessionStats `json:"flawlessSessions,omitempty"`
+	Cause                  string                `json:"cause,omitempty"`
 }
 
 type sessionLengthStats struct {
-	Total   float64 `json:"totalHours"`
-	Longest float64 `json:"longestHours"`
+	Total    float64 `json:"totalHours"`
+	Longest  float64 `json:"longestHours"`
 	Shortest float64 `json:"shortestHours"`
-	Average float64 `json:"averageHours"`
+	Average  float64 `json:"averageHours"`
 }
 
 type bestSessionsStats struct {
@@ -117,8 +117,8 @@ type coverageStats struct {
 }
 
 type playIntervalStats struct {
-	HourStart int     `json:"hourStart"`
-	HourEnd   int     `json:"hourEnd"`
+	HourStart  int     `json:"hourStart"`
+	HourEnd    int     `json:"hourEnd"`
 	Percentage float64 `json:"percentage"`
 }
 
@@ -284,7 +284,7 @@ func computeWrappedStats(ctx context.Context, playerPITs []domain.PlayerPIT, ses
 	// Filter to consecutive sessions only
 	consecutiveSessions := []domain.Session{}
 	nonConsecutiveCount := 0
-	
+
 	for _, session := range sessions {
 		if session.Consecutive {
 			consecutiveSessions = append(consecutiveSessions, session)
@@ -292,7 +292,7 @@ func computeWrappedStats(ctx context.Context, playerPITs []domain.PlayerPIT, ses
 			nonConsecutiveCount++
 		}
 	}
-	
+
 	response := wrappedResponse{
 		Year:                   year,
 		TotalSessions:          len(consecutiveSessions),
@@ -320,560 +320,560 @@ func computeWrappedStats(ctx context.Context, playerPITs []domain.PlayerPIT, ses
 
 // computeSessionLengths calculates session length statistics
 func computeSessionLengths(ctx context.Context, sessions []domain.Session) *sessionLengthStats {
-if len(sessions) == 0 {
-return nil
-}
+	if len(sessions) == 0 {
+		return nil
+	}
 
-var total, longest, shortest float64
-shortest = -1
+	var total, longest, shortest float64
+	shortest = -1
 
-for _, session := range sessions {
-duration := session.End.QueriedAt.Sub(session.Start.QueriedAt).Hours()
-total += duration
-if duration > longest {
-longest = duration
-}
-if shortest < 0 || duration < shortest {
-shortest = duration
-}
-}
+	for _, session := range sessions {
+		duration := session.End.QueriedAt.Sub(session.Start.QueriedAt).Hours()
+		total += duration
+		if duration > longest {
+			longest = duration
+		}
+		if shortest < 0 || duration < shortest {
+			shortest = duration
+		}
+	}
 
-return &sessionLengthStats{
-Total:    total,
-Longest:  longest,
-Shortest: shortest,
-Average:  total / float64(len(sessions)),
-}
+	return &sessionLengthStats{
+		Total:    total,
+		Longest:  longest,
+		Shortest: shortest,
+		Average:  total / float64(len(sessions)),
+	}
 }
 
 // computeSessionsPerMonth returns count of sessions per month (1-12)
 func computeSessionsPerMonth(ctx context.Context, sessions []domain.Session) map[int]int {
-counts := make(map[int]int)
+	counts := make(map[int]int)
 
-for _, session := range sessions {
-month := int(session.Start.QueriedAt.Month())
-counts[month]++
-}
+	for _, session := range sessions {
+		month := int(session.Start.QueriedAt.Month())
+		counts[month]++
+	}
 
-return counts
+	return counts
 }
 
 // computeBestSessions finds sessions with best performance in various categories
 func computeBestSessions(ctx context.Context, sessions []domain.Session) *bestSessionsStats {
-if len(sessions) == 0 {
-return nil
-}
+	if len(sessions) == 0 {
+		return nil
+	}
 
-var bestFKDR, bestKills, bestFinals, bestWins, bestLongest *domain.Session
-var bestWinsPerHour, bestFinalsPerHour *domain.Session
-var maxFKDR, maxWinsPerHour, maxFinalsPerHour float64
-var maxKills, maxFinals, maxWins int
-var maxDuration time.Duration
+	var bestFKDR, bestKills, bestFinals, bestWins, bestLongest *domain.Session
+	var bestWinsPerHour, bestFinalsPerHour *domain.Session
+	var maxFKDR, maxWinsPerHour, maxFinalsPerHour float64
+	var maxKills, maxFinals, maxWins int
+	var maxDuration time.Duration
 
-minSessionDuration := 15 * time.Minute
-minWins := 2
-minFinals := 10
+	minSessionDuration := 15 * time.Minute
+	minWins := 2
+	minFinals := 10
 
-for i := range sessions {
-session := &sessions[i]
-stats := calculateSessionStats(session.Start.Overall, session.End.Overall)
-duration := session.End.QueriedAt.Sub(session.Start.QueriedAt)
-durationHours := duration.Hours()
+	for i := range sessions {
+		session := &sessions[i]
+		stats := calculateSessionStats(session.Start.Overall, session.End.Overall)
+		duration := session.End.QueriedAt.Sub(session.Start.QueriedAt)
+		durationHours := duration.Hours()
 
-// FKDR
-if stats.FinalDeaths > 0 {
-fkdr := float64(stats.FinalKills) / float64(stats.FinalDeaths)
-if bestFKDR == nil || fkdr > maxFKDR {
-bestFKDR = session
-maxFKDR = fkdr
-}
-}
+		// FKDR
+		if stats.FinalDeaths > 0 {
+			fkdr := float64(stats.FinalKills) / float64(stats.FinalDeaths)
+			if bestFKDR == nil || fkdr > maxFKDR {
+				bestFKDR = session
+				maxFKDR = fkdr
+			}
+		}
 
-// Most kills
-if bestKills == nil || stats.Kills > maxKills {
-bestKills = session
-maxKills = stats.Kills
-}
+		// Most kills
+		if bestKills == nil || stats.Kills > maxKills {
+			bestKills = session
+			maxKills = stats.Kills
+		}
 
-// Most final kills
-if bestFinals == nil || stats.FinalKills > maxFinals {
-bestFinals = session
-maxFinals = stats.FinalKills
-}
+		// Most final kills
+		if bestFinals == nil || stats.FinalKills > maxFinals {
+			bestFinals = session
+			maxFinals = stats.FinalKills
+		}
 
-// Most wins
-if bestWins == nil || stats.Wins > maxWins {
-bestWins = session
-maxWins = stats.Wins
-}
+		// Most wins
+		if bestWins == nil || stats.Wins > maxWins {
+			bestWins = session
+			maxWins = stats.Wins
+		}
 
-// Longest session
-if bestLongest == nil || duration > maxDuration {
-bestLongest = session
-maxDuration = duration
-}
+		// Longest session
+		if bestLongest == nil || duration > maxDuration {
+			bestLongest = session
+			maxDuration = duration
+		}
 
-// Wins per hour (only if session is long enough and has enough wins)
-if duration >= minSessionDuration && stats.Wins >= minWins && durationHours > 0 {
-winsPerHour := float64(stats.Wins) / durationHours
-if bestWinsPerHour == nil || winsPerHour > maxWinsPerHour {
-bestWinsPerHour = session
-maxWinsPerHour = winsPerHour
-}
-}
+		// Wins per hour (only if session is long enough and has enough wins)
+		if duration >= minSessionDuration && stats.Wins >= minWins && durationHours > 0 {
+			winsPerHour := float64(stats.Wins) / durationHours
+			if bestWinsPerHour == nil || winsPerHour > maxWinsPerHour {
+				bestWinsPerHour = session
+				maxWinsPerHour = winsPerHour
+			}
+		}
 
-// Finals per hour (only if session is long enough and has enough finals)
-if duration >= minSessionDuration && stats.FinalKills >= minFinals && durationHours > 0 {
-finalsPerHour := float64(stats.FinalKills) / durationHours
-if bestFinalsPerHour == nil || finalsPerHour > maxFinalsPerHour {
-bestFinalsPerHour = session
-maxFinalsPerHour = finalsPerHour
-}
-}
-}
+		// Finals per hour (only if session is long enough and has enough finals)
+		if duration >= minSessionDuration && stats.FinalKills >= minFinals && durationHours > 0 {
+			finalsPerHour := float64(stats.FinalKills) / durationHours
+			if bestFinalsPerHour == nil || finalsPerHour > maxFinalsPerHour {
+				bestFinalsPerHour = session
+				maxFinalsPerHour = finalsPerHour
+			}
+		}
+	}
 
-result := &bestSessionsStats{}
+	result := &bestSessionsStats{}
 
-if bestFKDR != nil {
-stats := calculateSessionStats(bestFKDR.Start.Overall, bestFKDR.End.Overall)
-duration := bestFKDR.End.QueriedAt.Sub(bestFKDR.Start.QueriedAt)
-result.HighestFKDR = &sessionSummary{
-Start:    bestFKDR.Start.QueriedAt,
-End:      bestFKDR.End.QueriedAt,
-Duration: duration.Hours(),
-Stats:    stats,
-Value:    maxFKDR,
-}
-}
+	if bestFKDR != nil {
+		stats := calculateSessionStats(bestFKDR.Start.Overall, bestFKDR.End.Overall)
+		duration := bestFKDR.End.QueriedAt.Sub(bestFKDR.Start.QueriedAt)
+		result.HighestFKDR = &sessionSummary{
+			Start:    bestFKDR.Start.QueriedAt,
+			End:      bestFKDR.End.QueriedAt,
+			Duration: duration.Hours(),
+			Stats:    stats,
+			Value:    maxFKDR,
+		}
+	}
 
-if bestKills != nil {
-stats := calculateSessionStats(bestKills.Start.Overall, bestKills.End.Overall)
-duration := bestKills.End.QueriedAt.Sub(bestKills.Start.QueriedAt)
-result.MostKills = &sessionSummary{
-Start:    bestKills.Start.QueriedAt,
-End:      bestKills.End.QueriedAt,
-Duration: duration.Hours(),
-Stats:    stats,
-Value:    float64(maxKills),
-}
-}
+	if bestKills != nil {
+		stats := calculateSessionStats(bestKills.Start.Overall, bestKills.End.Overall)
+		duration := bestKills.End.QueriedAt.Sub(bestKills.Start.QueriedAt)
+		result.MostKills = &sessionSummary{
+			Start:    bestKills.Start.QueriedAt,
+			End:      bestKills.End.QueriedAt,
+			Duration: duration.Hours(),
+			Stats:    stats,
+			Value:    float64(maxKills),
+		}
+	}
 
-if bestFinals != nil {
-stats := calculateSessionStats(bestFinals.Start.Overall, bestFinals.End.Overall)
-duration := bestFinals.End.QueriedAt.Sub(bestFinals.Start.QueriedAt)
-result.MostFinalKills = &sessionSummary{
-Start:    bestFinals.Start.QueriedAt,
-End:      bestFinals.End.QueriedAt,
-Duration: duration.Hours(),
-Stats:    stats,
-Value:    float64(maxFinals),
-}
-}
+	if bestFinals != nil {
+		stats := calculateSessionStats(bestFinals.Start.Overall, bestFinals.End.Overall)
+		duration := bestFinals.End.QueriedAt.Sub(bestFinals.Start.QueriedAt)
+		result.MostFinalKills = &sessionSummary{
+			Start:    bestFinals.Start.QueriedAt,
+			End:      bestFinals.End.QueriedAt,
+			Duration: duration.Hours(),
+			Stats:    stats,
+			Value:    float64(maxFinals),
+		}
+	}
 
-if bestWins != nil {
-stats := calculateSessionStats(bestWins.Start.Overall, bestWins.End.Overall)
-duration := bestWins.End.QueriedAt.Sub(bestWins.Start.QueriedAt)
-result.MostWins = &sessionSummary{
-Start:    bestWins.Start.QueriedAt,
-End:      bestWins.End.QueriedAt,
-Duration: duration.Hours(),
-Stats:    stats,
-Value:    float64(maxWins),
-}
-}
+	if bestWins != nil {
+		stats := calculateSessionStats(bestWins.Start.Overall, bestWins.End.Overall)
+		duration := bestWins.End.QueriedAt.Sub(bestWins.Start.QueriedAt)
+		result.MostWins = &sessionSummary{
+			Start:    bestWins.Start.QueriedAt,
+			End:      bestWins.End.QueriedAt,
+			Duration: duration.Hours(),
+			Stats:    stats,
+			Value:    float64(maxWins),
+		}
+	}
 
-if bestLongest != nil {
-stats := calculateSessionStats(bestLongest.Start.Overall, bestLongest.End.Overall)
-result.LongestSession = &sessionSummary{
-Start:    bestLongest.Start.QueriedAt,
-End:      bestLongest.End.QueriedAt,
-Duration: maxDuration.Hours(),
-Stats:    stats,
-Value:    maxDuration.Hours(),
-}
-}
+	if bestLongest != nil {
+		stats := calculateSessionStats(bestLongest.Start.Overall, bestLongest.End.Overall)
+		result.LongestSession = &sessionSummary{
+			Start:    bestLongest.Start.QueriedAt,
+			End:      bestLongest.End.QueriedAt,
+			Duration: maxDuration.Hours(),
+			Stats:    stats,
+			Value:    maxDuration.Hours(),
+		}
+	}
 
-if bestWinsPerHour != nil {
-stats := calculateSessionStats(bestWinsPerHour.Start.Overall, bestWinsPerHour.End.Overall)
-duration := bestWinsPerHour.End.QueriedAt.Sub(bestWinsPerHour.Start.QueriedAt)
-result.MostWinsPerHour = &sessionSummary{
-Start:    bestWinsPerHour.Start.QueriedAt,
-End:      bestWinsPerHour.End.QueriedAt,
-Duration: duration.Hours(),
-Stats:    stats,
-Value:    maxWinsPerHour,
-}
-}
+	if bestWinsPerHour != nil {
+		stats := calculateSessionStats(bestWinsPerHour.Start.Overall, bestWinsPerHour.End.Overall)
+		duration := bestWinsPerHour.End.QueriedAt.Sub(bestWinsPerHour.Start.QueriedAt)
+		result.MostWinsPerHour = &sessionSummary{
+			Start:    bestWinsPerHour.Start.QueriedAt,
+			End:      bestWinsPerHour.End.QueriedAt,
+			Duration: duration.Hours(),
+			Stats:    stats,
+			Value:    maxWinsPerHour,
+		}
+	}
 
-if bestFinalsPerHour != nil {
-stats := calculateSessionStats(bestFinalsPerHour.Start.Overall, bestFinalsPerHour.End.Overall)
-duration := bestFinalsPerHour.End.QueriedAt.Sub(bestFinalsPerHour.Start.QueriedAt)
-result.MostFinalsPerHour = &sessionSummary{
-Start:    bestFinalsPerHour.Start.QueriedAt,
-End:      bestFinalsPerHour.End.QueriedAt,
-Duration: duration.Hours(),
-Stats:    stats,
-Value:    maxFinalsPerHour,
-}
-}
+	if bestFinalsPerHour != nil {
+		stats := calculateSessionStats(bestFinalsPerHour.Start.Overall, bestFinalsPerHour.End.Overall)
+		duration := bestFinalsPerHour.End.QueriedAt.Sub(bestFinalsPerHour.Start.QueriedAt)
+		result.MostFinalsPerHour = &sessionSummary{
+			Start:    bestFinalsPerHour.Start.QueriedAt,
+			End:      bestFinalsPerHour.End.QueriedAt,
+			Duration: duration.Hours(),
+			Stats:    stats,
+			Value:    maxFinalsPerHour,
+		}
+	}
 
-return result
+	return result
 }
 
 // computeAverages calculates average statistics across all sessions
 func computeAverages(ctx context.Context, sessions []domain.Session) *averageStats {
-if len(sessions) == 0 {
-return nil
-}
+	if len(sessions) == 0 {
+		return nil
+	}
 
-var totalDuration float64
-var totalGames, totalWins, totalFinalKills int
+	var totalDuration float64
+	var totalGames, totalWins, totalFinalKills int
 
-for _, session := range sessions {
-duration := session.End.QueriedAt.Sub(session.Start.QueriedAt).Hours()
-totalDuration += duration
+	for _, session := range sessions {
+		duration := session.End.QueriedAt.Sub(session.Start.QueriedAt).Hours()
+		totalDuration += duration
 
-stats := calculateSessionStats(session.Start.Overall, session.End.Overall)
-totalGames += stats.GamesPlayed
-totalWins += stats.Wins
-totalFinalKills += stats.FinalKills
-}
+		stats := calculateSessionStats(session.Start.Overall, session.End.Overall)
+		totalGames += stats.GamesPlayed
+		totalWins += stats.Wins
+		totalFinalKills += stats.FinalKills
+	}
 
-numSessions := float64(len(sessions))
-return &averageStats{
-SessionLength: totalDuration / numSessions,
-GamesPlayed:   float64(totalGames) / numSessions,
-Wins:          float64(totalWins) / numSessions,
-FinalKills:    float64(totalFinalKills) / numSessions,
-}
+	numSessions := float64(len(sessions))
+	return &averageStats{
+		SessionLength: totalDuration / numSessions,
+		GamesPlayed:   float64(totalGames) / numSessions,
+		Wins:          float64(totalWins) / numSessions,
+		FinalKills:    float64(totalFinalKills) / numSessions,
+	}
 }
 
 // computeYearBoundaryStats finds the first and last player stats in the year
 func computeYearBoundaryStats(ctx context.Context, playerPITs []domain.PlayerPIT, year int) *yearBoundaryStats {
-if len(playerPITs) == 0 {
-return nil
-}
+	if len(playerPITs) == 0 {
+		return nil
+	}
 
-yearStart := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
-yearEnd := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC).Add(-time.Nanosecond)
+	yearStart := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+	yearEnd := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC).Add(-time.Nanosecond)
 
-var firstPIT, lastPIT *domain.PlayerPIT
+	var firstPIT, lastPIT *domain.PlayerPIT
 
-for i := range playerPITs {
-pit := &playerPITs[i]
-if pit.QueriedAt.Before(yearStart) || pit.QueriedAt.After(yearEnd) {
-continue
-}
+	for i := range playerPITs {
+		pit := &playerPITs[i]
+		if pit.QueriedAt.Before(yearStart) || pit.QueriedAt.After(yearEnd) {
+			continue
+		}
 
-if firstPIT == nil || pit.QueriedAt.Before(firstPIT.QueriedAt) {
-firstPIT = pit
-}
-if lastPIT == nil || pit.QueriedAt.After(lastPIT.QueriedAt) {
-lastPIT = pit
-}
-}
+		if firstPIT == nil || pit.QueriedAt.Before(firstPIT.QueriedAt) {
+			firstPIT = pit
+		}
+		if lastPIT == nil || pit.QueriedAt.After(lastPIT.QueriedAt) {
+			lastPIT = pit
+		}
+	}
 
-if firstPIT == nil && lastPIT == nil {
-return nil
-}
+	if firstPIT == nil && lastPIT == nil {
+		return nil
+	}
 
-return &yearBoundaryStats{
-Start: firstPIT,
-End:   lastPIT,
-}
+	return &yearBoundaryStats{
+		Start: firstPIT,
+		End:   lastPIT,
+	}
 }
 
 // computeWinstreaks calculates the highest winstreak for each gamemode during the year
 func computeWinstreaks(ctx context.Context, playerPITs []domain.PlayerPIT) *winstreakStats {
-if len(playerPITs) == 0 {
-return nil
-}
+	if len(playerPITs) == 0 {
+		return nil
+	}
 
-result := &winstreakStats{}
+	result := &winstreakStats{}
 
-// Helper to compute winstreak for a gamemode
-computeGamemodeWinstreak := func(getStats func(*domain.PlayerPIT) domain.GamemodeStatsPIT) *gamemodeWinstreak {
-var maxStreak int
-var maxStreakTime time.Time
-currentStreak := 0
-prevWins := 0
-prevLosses := 0
+	// Helper to compute winstreak for a gamemode
+	computeGamemodeWinstreak := func(getStats func(*domain.PlayerPIT) domain.GamemodeStatsPIT) *gamemodeWinstreak {
+		var maxStreak int
+		var maxStreakTime time.Time
+		currentStreak := 0
+		prevWins := 0
+		prevLosses := 0
 
-for i := range playerPITs {
-pit := &playerPITs[i]
-stats := getStats(pit)
+		for i := range playerPITs {
+			pit := &playerPITs[i]
+			stats := getStats(pit)
 
-wins := stats.Wins
-losses := stats.Losses
+			wins := stats.Wins
+			losses := stats.Losses
 
-winsGained := wins - prevWins
-lossesGained := losses - prevLosses
+			winsGained := wins - prevWins
+			lossesGained := losses - prevLosses
 
-if lossesGained > 0 {
-// Streak broken
-currentStreak = 0
-} else if winsGained > 0 {
-// Streak continues/starts
-currentStreak += winsGained
-if currentStreak > maxStreak {
-maxStreak = currentStreak
-maxStreakTime = pit.QueriedAt
-}
-}
+			if lossesGained > 0 {
+				// Streak broken
+				currentStreak = 0
+			} else if winsGained > 0 {
+				// Streak continues/starts
+				currentStreak += winsGained
+				if currentStreak > maxStreak {
+					maxStreak = currentStreak
+					maxStreakTime = pit.QueriedAt
+				}
+			}
 
-prevWins = wins
-prevLosses = losses
-}
+			prevWins = wins
+			prevLosses = losses
+		}
 
-// Don't count ongoing streaks
-if currentStreak == maxStreak {
-maxStreak = 0
-maxStreakTime = time.Time{}
-}
+		// Don't count ongoing streaks
+		if currentStreak == maxStreak {
+			maxStreak = 0
+			maxStreakTime = time.Time{}
+		}
 
-if maxStreak > 0 {
-return &gamemodeWinstreak{
-Highest: maxStreak,
-When:    maxStreakTime,
-}
-}
-return nil
-}
+		if maxStreak > 0 {
+			return &gamemodeWinstreak{
+				Highest: maxStreak,
+				When:    maxStreakTime,
+			}
+		}
+		return nil
+	}
 
-result.Overall = computeGamemodeWinstreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Overall })
-result.Solo = computeGamemodeWinstreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Solo })
-result.Doubles = computeGamemodeWinstreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Doubles })
-result.Threes = computeGamemodeWinstreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Threes })
-result.Fours = computeGamemodeWinstreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Fours })
+	result.Overall = computeGamemodeWinstreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Overall })
+	result.Solo = computeGamemodeWinstreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Solo })
+	result.Doubles = computeGamemodeWinstreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Doubles })
+	result.Threes = computeGamemodeWinstreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Threes })
+	result.Fours = computeGamemodeWinstreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Fours })
 
-return result
+	return result
 }
 
 // computeFinalKillStreaks calculates the highest final kill streak for each gamemode during the year
 func computeFinalKillStreaks(ctx context.Context, playerPITs []domain.PlayerPIT) *finalKillStreakStats {
-if len(playerPITs) == 0 {
-return nil
-}
+	if len(playerPITs) == 0 {
+		return nil
+	}
 
-result := &finalKillStreakStats{}
+	result := &finalKillStreakStats{}
 
-// Helper to compute final kill streak for a gamemode
-computeGamemodeFKStreak := func(getStats func(*domain.PlayerPIT) domain.GamemodeStatsPIT) *gamemodeFinalKillStreak {
-var maxStreak int
-var maxStreakTime time.Time
-currentStreak := 0
-prevFKills := 0
-prevFDeaths := 0
+	// Helper to compute final kill streak for a gamemode
+	computeGamemodeFKStreak := func(getStats func(*domain.PlayerPIT) domain.GamemodeStatsPIT) *gamemodeFinalKillStreak {
+		var maxStreak int
+		var maxStreakTime time.Time
+		currentStreak := 0
+		prevFKills := 0
+		prevFDeaths := 0
 
-for i := range playerPITs {
-pit := &playerPITs[i]
-stats := getStats(pit)
+		for i := range playerPITs {
+			pit := &playerPITs[i]
+			stats := getStats(pit)
 
-fkills := stats.FinalKills
-fdeaths := stats.FinalDeaths
+			fkills := stats.FinalKills
+			fdeaths := stats.FinalDeaths
 
-fkillsGained := fkills - prevFKills
-fdeathsGained := fdeaths - prevFDeaths
+			fkillsGained := fkills - prevFKills
+			fdeathsGained := fdeaths - prevFDeaths
 
-if fdeathsGained > 0 {
-// Streak broken
-currentStreak = 0
-} else if fkillsGained > 0 {
-// Streak continues/starts
-currentStreak += fkillsGained
-if currentStreak > maxStreak {
-maxStreak = currentStreak
-maxStreakTime = pit.QueriedAt
-}
-}
+			if fdeathsGained > 0 {
+				// Streak broken
+				currentStreak = 0
+			} else if fkillsGained > 0 {
+				// Streak continues/starts
+				currentStreak += fkillsGained
+				if currentStreak > maxStreak {
+					maxStreak = currentStreak
+					maxStreakTime = pit.QueriedAt
+				}
+			}
 
-prevFKills = fkills
-prevFDeaths = fdeaths
-}
+			prevFKills = fkills
+			prevFDeaths = fdeaths
+		}
 
-// Don't count ongoing streaks
-if currentStreak == maxStreak {
-maxStreak = 0
-maxStreakTime = time.Time{}
-}
+		// Don't count ongoing streaks
+		if currentStreak == maxStreak {
+			maxStreak = 0
+			maxStreakTime = time.Time{}
+		}
 
-if maxStreak > 0 {
-return &gamemodeFinalKillStreak{
-Highest: maxStreak,
-When:    maxStreakTime,
-}
-}
-return nil
-}
+		if maxStreak > 0 {
+			return &gamemodeFinalKillStreak{
+				Highest: maxStreak,
+				When:    maxStreakTime,
+			}
+		}
+		return nil
+	}
 
-result.Overall = computeGamemodeFKStreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Overall })
-result.Solo = computeGamemodeFKStreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Solo })
-result.Doubles = computeGamemodeFKStreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Doubles })
-result.Threes = computeGamemodeFKStreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Threes })
-result.Fours = computeGamemodeFKStreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Fours })
+	result.Overall = computeGamemodeFKStreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Overall })
+	result.Solo = computeGamemodeFKStreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Solo })
+	result.Doubles = computeGamemodeFKStreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Doubles })
+	result.Threes = computeGamemodeFKStreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Threes })
+	result.Fours = computeGamemodeFKStreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Fours })
 
-return result
+	return result
 }
 
 // computeCoverage calculates what percentage of stats were covered by sessions
 func computeCoverage(ctx context.Context, playerPITs []domain.PlayerPIT, sessions []domain.Session, year int) *coverageStats {
-if len(playerPITs) == 0 {
-return nil
-}
+	if len(playerPITs) == 0 {
+		return nil
+	}
 
-yearStart := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
-yearEnd := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC).Add(-time.Nanosecond)
+	yearStart := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+	yearEnd := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC).Add(-time.Nanosecond)
 
-// Find first and last PIT in year
-var firstPIT, lastPIT *domain.PlayerPIT
-for i := range playerPITs {
-pit := &playerPITs[i]
-if pit.QueriedAt.Before(yearStart) || pit.QueriedAt.After(yearEnd) {
-continue
-}
-if firstPIT == nil || pit.QueriedAt.Before(firstPIT.QueriedAt) {
-firstPIT = pit
-}
-if lastPIT == nil || pit.QueriedAt.After(lastPIT.QueriedAt) {
-lastPIT = pit
-}
-}
+	// Find first and last PIT in year
+	var firstPIT, lastPIT *domain.PlayerPIT
+	for i := range playerPITs {
+		pit := &playerPITs[i]
+		if pit.QueriedAt.Before(yearStart) || pit.QueriedAt.After(yearEnd) {
+			continue
+		}
+		if firstPIT == nil || pit.QueriedAt.Before(firstPIT.QueriedAt) {
+			firstPIT = pit
+		}
+		if lastPIT == nil || pit.QueriedAt.After(lastPIT.QueriedAt) {
+			lastPIT = pit
+		}
+	}
 
-if firstPIT == nil || lastPIT == nil {
-return nil
-}
+	if firstPIT == nil || lastPIT == nil {
+		return nil
+	}
 
-// Total games played in year
-totalGames := lastPIT.Overall.GamesPlayed - firstPIT.Overall.GamesPlayed
-if totalGames <= 0 {
-return &coverageStats{
-GamesPlayedPercentage: 0,
-AdjustedTotalHours:    0,
-}
-}
+	// Total games played in year
+	totalGames := lastPIT.Overall.GamesPlayed - firstPIT.Overall.GamesPlayed
+	if totalGames <= 0 {
+		return &coverageStats{
+			GamesPlayedPercentage: 0,
+			AdjustedTotalHours:    0,
+		}
+	}
 
-// Games covered by sessions
-sessionGames := 0
-var sessionDuration float64
-for _, session := range sessions {
-stats := calculateSessionStats(session.Start.Overall, session.End.Overall)
-sessionGames += stats.GamesPlayed
-sessionDuration += session.End.QueriedAt.Sub(session.Start.QueriedAt).Hours()
-}
+	// Games covered by sessions
+	sessionGames := 0
+	var sessionDuration float64
+	for _, session := range sessions {
+		stats := calculateSessionStats(session.Start.Overall, session.End.Overall)
+		sessionGames += stats.GamesPlayed
+		sessionDuration += session.End.QueriedAt.Sub(session.Start.QueriedAt).Hours()
+	}
 
-coverage := float64(sessionGames) / float64(totalGames) * 100
+	coverage := float64(sessionGames) / float64(totalGames) * 100
 
-// Adjust total session time based on coverage
-adjustedHours := sessionDuration
-if coverage > 0 && coverage < 100 {
-adjustedHours = sessionDuration / (coverage / 100)
-}
+	// Adjust total session time based on coverage
+	adjustedHours := sessionDuration
+	if coverage > 0 && coverage < 100 {
+		adjustedHours = sessionDuration / (coverage / 100)
+	}
 
-return &coverageStats{
-GamesPlayedPercentage: coverage,
-AdjustedTotalHours:    adjustedHours,
-}
+	return &coverageStats{
+		GamesPlayedPercentage: coverage,
+		AdjustedTotalHours:    adjustedHours,
+	}
 }
 
 // computeFavoritePlayIntervals calculates which time intervals have most playtime
 func computeFavoritePlayIntervals(ctx context.Context, sessions []domain.Session) []playIntervalStats {
-if len(sessions) == 0 {
-return nil
-}
+	if len(sessions) == 0 {
+		return nil
+	}
 
-// Track playtime in each hour bucket (0-23)
-hourBuckets := make([]float64, 24)
-var totalTime float64
+	// Track playtime in each hour bucket (0-23)
+	hourBuckets := make([]float64, 24)
+	var totalTime float64
 
-for _, session := range sessions {
-duration := session.End.QueriedAt.Sub(session.Start.QueriedAt)
-totalTime += duration.Hours()
+	for _, session := range sessions {
+		duration := session.End.QueriedAt.Sub(session.Start.QueriedAt)
+		totalTime += duration.Hours()
 
-// Distribute time across hours
-start := session.Start.QueriedAt
-end := session.End.QueriedAt
+		// Distribute time across hours
+		start := session.Start.QueriedAt
+		end := session.End.QueriedAt
 
-for t := start; t.Before(end); t = t.Add(time.Hour) {
-hour := t.Hour()
-remaining := end.Sub(t)
-if remaining > time.Hour {
-hourBuckets[hour] += 1.0
-} else {
-hourBuckets[hour] += remaining.Hours()
-}
-}
-}
+		for t := start; t.Before(end); t = t.Add(time.Hour) {
+			hour := t.Hour()
+			remaining := end.Sub(t)
+			if remaining > time.Hour {
+				hourBuckets[hour] += 1.0
+			} else {
+				hourBuckets[hour] += remaining.Hours()
+			}
+		}
+	}
 
-if totalTime == 0 {
-return nil
-}
+	if totalTime == 0 {
+		return nil
+	}
 
-// Find top 3 intervals
-type interval struct {
-start      int
-end        int
-percentage float64
-}
+	// Find top 3 intervals
+	type interval struct {
+		start      int
+		end        int
+		percentage float64
+	}
 
-intervals := []interval{}
+	intervals := []interval{}
 
-// Try 4-hour windows
-for start := 0; start < 24; start++ {
-var windowTime float64
-for i := 0; i < 4; i++ {
-hour := (start + i) % 24
-windowTime += hourBuckets[hour]
-}
-percentage := windowTime / totalTime * 100
-if percentage > 5 { // Only include if > 5%
-intervals = append(intervals, interval{
-start:      start,
-end:        (start + 4) % 24,
-percentage: percentage,
-})
-}
-}
+	// Try 4-hour windows
+	for start := 0; start < 24; start++ {
+		var windowTime float64
+		for i := 0; i < 4; i++ {
+			hour := (start + i) % 24
+			windowTime += hourBuckets[hour]
+		}
+		percentage := windowTime / totalTime * 100
+		if percentage > 5 { // Only include if > 5%
+			intervals = append(intervals, interval{
+				start:      start,
+				end:        (start + 4) % 24,
+				percentage: percentage,
+			})
+		}
+	}
 
-// Sort by percentage
-for i := 0; i < len(intervals); i++ {
-for j := i + 1; j < len(intervals); j++ {
-if intervals[j].percentage > intervals[i].percentage {
-intervals[i], intervals[j] = intervals[j], intervals[i]
-}
-}
-}
+	// Sort by percentage
+	for i := 0; i < len(intervals); i++ {
+		for j := i + 1; j < len(intervals); j++ {
+			if intervals[j].percentage > intervals[i].percentage {
+				intervals[i], intervals[j] = intervals[j], intervals[i]
+			}
+		}
+	}
 
-// Take top 3
-result := []playIntervalStats{}
-for i := 0; i < len(intervals) && i < 3; i++ {
-result = append(result, playIntervalStats{
-HourStart:  intervals[i].start,
-HourEnd:    intervals[i].end,
-Percentage: intervals[i].percentage,
-})
-}
+	// Take top 3
+	result := []playIntervalStats{}
+	for i := 0; i < len(intervals) && i < 3; i++ {
+		result = append(result, playIntervalStats{
+			HourStart:  intervals[i].start,
+			HourEnd:    intervals[i].end,
+			Percentage: intervals[i].percentage,
+		})
+	}
 
-return result
+	return result
 }
 
 // computeFlawlessSessions counts sessions with no losses and no final deaths
 func computeFlawlessSessions(ctx context.Context, sessions []domain.Session) *flawlessSessionStats {
-if len(sessions) == 0 {
-return nil
-}
+	if len(sessions) == 0 {
+		return nil
+	}
 
-flawlessCount := 0
-for _, session := range sessions {
-stats := calculateSessionStats(session.Start.Overall, session.End.Overall)
-if stats.Losses == 0 && stats.FinalDeaths == 0 {
-flawlessCount++
-}
-}
+	flawlessCount := 0
+	for _, session := range sessions {
+		stats := calculateSessionStats(session.Start.Overall, session.End.Overall)
+		if stats.Losses == 0 && stats.FinalDeaths == 0 {
+			flawlessCount++
+		}
+	}
 
-percentage := float64(flawlessCount) / float64(len(sessions)) * 100
+	percentage := float64(flawlessCount) / float64(len(sessions)) * 100
 
-return &flawlessSessionStats{
-Count:      flawlessCount,
-Percentage: percentage,
-}
+	return &flawlessSessionStats{
+		Count:      flawlessCount,
+		Percentage: percentage,
+	}
 }
