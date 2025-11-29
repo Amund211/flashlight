@@ -48,7 +48,7 @@ type wrappedStats struct {
 }
 
 func MakeGetWrappedHandler(
-	getSessions app.GetSessions,
+	getPlayerPITs app.GetPlayerPITs,
 	allowedOrigins *DomainSuffixes,
 	rootLogger *slog.Logger,
 	sentryMiddleware func(http.HandlerFunc) http.HandlerFunc,
@@ -139,19 +139,25 @@ func MakeGetWrappedHandler(
 		)
 
 		// Calculate start and end times for the year
-		start := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
-		end := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC).Add(-time.Nanosecond)
+		// Add 24 hour padding as per existing pattern
+		start := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC).Add(-24 * time.Hour)
+		end := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC).Add(-time.Nanosecond).Add(24 * time.Hour)
 
-		// Get sessions for the year
-		sessions, err := getSessions(ctx, uuid, start, end)
+		// Get player PITs for the year
+		playerPITs, err := getPlayerPITs(ctx, uuid, start, end)
 		if err != nil {
-			// NOTE: GetSessions implementations handle their own error reporting
+			// NOTE: GetPlayerPITs implementations handle their own error reporting
 			statusCode := http.StatusInternalServerError
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(statusCode)
-			w.Write([]byte(`{"success":false,"cause":"Failed to get sessions"}`))
+			w.Write([]byte(`{"success":false,"cause":"Failed to get player data"}`))
 			return
 		}
+
+		// Compute sessions from player PITs
+		yearStart := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+		yearEnd := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC).Add(-time.Nanosecond)
+		sessions := app.ComputeSessions(ctx, playerPITs, yearStart, yearEnd)
 
 		// Compute wrapped statistics
 		wrappedData := computeWrappedStats(sessions, year)
