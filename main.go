@@ -287,7 +287,7 @@ func main() {
 	handleFunc(
 		"GET /v1/wrapped/{uuid}/{year}",
 		ports.MakeGetWrappedHandler(
-			getSessions,
+			getPlayerPITs,
 			allowedOrigins,
 			logger.With("port", "wrapped"),
 			sentryMiddleware,
