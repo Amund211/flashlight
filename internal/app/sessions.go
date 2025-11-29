@@ -1,14 +1,17 @@
 package app
 
 import (
+	"context"
+	"fmt"
 	"slices"
 	"time"
 
 	"github.com/Amund211/flashlight/internal/domain"
+	"github.com/Amund211/flashlight/internal/reporting"
 )
 
-// NOTE: All domain.PlayerPIT entries must for the same player
-func ComputeSessions(stats []domain.PlayerPIT, start, end time.Time) []domain.Session {
+// NOTE: All domain.PlayerPIT entries must be for the same player
+func ComputeSessions(ctx context.Context, stats []domain.PlayerPIT, start, end time.Time) []domain.Session {
 	if len(stats) <= 1 {
 		// Need at least a start and end to create a session
 		return []domain.Session{}
@@ -60,7 +63,13 @@ func ComputeSessions(stats []domain.PlayerPIT, start, end time.Time) []domain.Se
 		}
 
 		if lastEventfulIndex == -1 {
-			panic("lastEventfulIndex is -1")
+			err := fmt.Errorf("lastEventfulIndex is -1 in ComputeSessions")
+			reporting.Report(ctx, err, map[string]string{
+				"sessionStartIndex": fmt.Sprintf("%d", sessionStartIndex),
+				"currentIndex":      fmt.Sprintf("%d", i),
+				"statsLength":       fmt.Sprintf("%d", len(stats)),
+			})
+			return []domain.Session{}
 		}
 
 		stat := &stats[i]

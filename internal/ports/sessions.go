@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/Amund211/flashlight/internal/adapters/playerrepository"
 	"github.com/Amund211/flashlight/internal/app"
 	"github.com/Amund211/flashlight/internal/logging"
 	"github.com/Amund211/flashlight/internal/ratelimiting"
@@ -18,8 +17,7 @@ import (
 )
 
 func MakeGetSessionsHandler(
-	playerRepo playerrepository.PlayerRepository,
-	updatePlayerInInterval app.UpdatePlayerInInterval,
+	getPlayerPITs app.GetPlayerPITs,
 	allowedOrigins *DomainSuffixes,
 	rootLogger *slog.Logger,
 	sentryMiddleware func(http.HandlerFunc) http.HandlerFunc,
@@ -130,27 +128,18 @@ func MakeGetSessionsHandler(
 			return
 		}
 
-		err = updatePlayerInInterval(ctx, uuid, request.Start, request.End)
-		if err != nil {
-			// NOTE: UpdatePlayerInInterval implementations handle their own error reporting
-			logging.FromContext(ctx).ErrorContext(ctx, "Failed to update player data in interval", "error", err)
-
-			// NOTE: We continue even though we failed to update player data
-			// We may still be able to get the history and fulfill the request
-		}
-
 		// Add some padding on both sides to try to complete sessions that cross the interval borders
 		filterStart := request.Start.Add(-24 * time.Hour)
 		filterEnd := request.End.Add(24 * time.Hour)
 
-		stats, err := playerRepo.GetPlayerPITs(ctx, uuid, filterStart, filterEnd)
+		stats, err := getPlayerPITs(ctx, uuid, filterStart, filterEnd)
 		if err != nil {
-			// NOTE: PlayerRepository implementations handle their own error reporting
+			// NOTE: GetPlayerPITs implementations handle their own error reporting
 			http.Error(w, "Failed to get player data", http.StatusInternalServerError)
 			return
 		}
 
-		sessions := app.ComputeSessions(stats, request.Start, request.End)
+		sessions := app.ComputeSessions(ctx, stats, request.Start, request.End)
 
 		marshalled, err := SessionsToRainbowSessionsData(sessions)
 		if err != nil {

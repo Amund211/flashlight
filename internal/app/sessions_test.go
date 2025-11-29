@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -61,6 +62,7 @@ func TestComputeSessions(t *testing.T) {
 	}
 
 	t.Run("random clusters", func(t *testing.T) {
+		ctx := context.Background()
 		t.Parallel()
 		playerUUID := domaintest.NewUUID(t)
 		start := time.Date(2022, time.February, 14, 0, 0, 0, 0, time.FixedZone("UTC", 3600*1))
@@ -102,7 +104,7 @@ func TestComputeSessions(t *testing.T) {
 		players[24] = domaintest.NewPlayerBuilder(playerUUID, start.Add(3*time.Hour).Add(56*time.Minute)).WithGamesPlayed(18).WithExperience(9_500).FromDB().Build()
 		players[25] = domaintest.NewPlayerBuilder(playerUUID, start.Add(4*time.Hour).Add(16*time.Minute)).WithGamesPlayed(19).WithExperience(10_800).FromDB().Build()
 
-		sessions := app.ComputeSessions(players, start, start.Add(24*time.Hour))
+		sessions := app.ComputeSessions(ctx, players, start, start.Add(24*time.Hour))
 
 		expectedSessions := []domain.Session{
 			{
@@ -120,6 +122,7 @@ func TestComputeSessions(t *testing.T) {
 	})
 
 	t.Run("Single stat", func(t *testing.T) {
+		ctx := context.Background()
 		t.Parallel()
 		playerUUID := domaintest.NewUUID(t)
 		start := time.Date(2021, time.January, 1, 0, 0, 0, 0, time.FixedZone("UTC", -3600*8))
@@ -127,12 +130,13 @@ func TestComputeSessions(t *testing.T) {
 		players := make([]domain.PlayerPIT, 1)
 		players[0] = domaintest.NewPlayerBuilder(playerUUID, start.Add(6*time.Hour).Add(7*time.Minute)).WithGamesPlayed(11).WithExperience(1_300).FromDB().Build()
 
-		sessions := app.ComputeSessions(players, start, start.Add(24*time.Hour))
+		sessions := app.ComputeSessions(ctx, players, start, start.Add(24*time.Hour))
 
 		require.Len(t, sessions, 0)
 	})
 
 	t.Run("Single stat at the start", func(t *testing.T) {
+		ctx := context.Background()
 		t.Parallel()
 		playerUUID := domaintest.NewUUID(t)
 		start := time.Date(2021, time.January, 1, 0, 0, 0, 0, time.FixedZone("UTC", -3600*8))
@@ -143,7 +147,7 @@ func TestComputeSessions(t *testing.T) {
 		players[1] = domaintest.NewPlayerBuilder(playerUUID, start.Add(8*time.Hour).Add(-1*time.Minute)).WithGamesPlayed(10).WithExperience(1_100).FromDB().Build()
 		players[2] = domaintest.NewPlayerBuilder(playerUUID, start.Add(8*time.Hour).Add(7*time.Minute)).WithGamesPlayed(11).WithExperience(1_300).FromDB().Build()
 
-		sessions := app.ComputeSessions(players, start, start.Add(24*time.Hour))
+		sessions := app.ComputeSessions(ctx, players, start, start.Add(24*time.Hour))
 
 		expectedSessions := []domain.Session{
 			{
@@ -156,6 +160,7 @@ func TestComputeSessions(t *testing.T) {
 	})
 
 	t.Run("Single stat at the end", func(t *testing.T) {
+		ctx := context.Background()
 		t.Parallel()
 		playerUUID := domaintest.NewUUID(t)
 		start := time.Date(2021, time.January, 1, 0, 0, 0, 0, time.FixedZone("UTC", -3600*8))
@@ -166,7 +171,7 @@ func TestComputeSessions(t *testing.T) {
 
 		players[2] = domaintest.NewPlayerBuilder(playerUUID, start.Add(8*time.Hour).Add(7*time.Minute)).WithGamesPlayed(12).WithExperience(1_600).FromDB().Build()
 
-		sessions := app.ComputeSessions(players, start, start.Add(24*time.Hour))
+		sessions := app.ComputeSessions(ctx, players, start, start.Add(24*time.Hour))
 
 		expectedSessions := []domain.Session{
 			{
@@ -179,6 +184,7 @@ func TestComputeSessions(t *testing.T) {
 	})
 
 	t.Run("Single stat at start and end", func(t *testing.T) {
+		ctx := context.Background()
 		t.Parallel()
 		playerUUID := domaintest.NewUUID(t)
 		start := time.Date(2021, time.January, 1, 0, 0, 0, 0, time.FixedZone("UTC", -3600*2))
@@ -191,7 +197,7 @@ func TestComputeSessions(t *testing.T) {
 
 		players[3] = domaintest.NewPlayerBuilder(playerUUID, start.Add(10*time.Hour).Add(7*time.Minute)).WithGamesPlayed(12).WithExperience(1_600).FromDB().Build()
 
-		sessions := app.ComputeSessions(players, start, start.Add(24*time.Hour))
+		sessions := app.ComputeSessions(ctx, players, start, start.Add(24*time.Hour))
 
 		expectedSessions := []domain.Session{
 			{
@@ -204,17 +210,19 @@ func TestComputeSessions(t *testing.T) {
 	})
 
 	t.Run("No stats", func(t *testing.T) {
+		ctx := context.Background()
 		t.Parallel()
 		start := time.Date(2021, time.January, 1, 0, 0, 0, 0, time.FixedZone("UTC", -3600*10))
 
 		players := make([]domain.PlayerPIT, 0)
 
-		sessions := app.ComputeSessions(players, start, start.Add(24*time.Hour))
+		sessions := app.ComputeSessions(ctx, players, start, start.Add(24*time.Hour))
 
 		require.Len(t, sessions, 0)
 	})
 
 	t.Run("inactivity between sessions", func(t *testing.T) {
+		ctx := context.Background()
 		t.Parallel()
 		playerUUID := domaintest.NewUUID(t)
 		start := time.Date(2021, time.January, 1, 0, 0, 0, 0, time.FixedZone("UTC", -3600*2))
@@ -234,7 +242,7 @@ func TestComputeSessions(t *testing.T) {
 		players[11] = domaintest.NewPlayerBuilder(playerUUID, start.Add(4*time.Hour).Add(16*time.Minute)).WithGamesPlayed(19).WithExperience(10_800).FromDB().Build()
 		players[12] = domaintest.NewPlayerBuilder(playerUUID, start.Add(4*time.Hour).Add(20*time.Minute)).WithGamesPlayed(19).WithExperience(10_800).FromDB().Build()
 
-		sessions := app.ComputeSessions(players, start, start.Add(24*time.Hour))
+		sessions := app.ComputeSessions(ctx, players, start, start.Add(24*time.Hour))
 
 		expectedSessions := []domain.Session{
 			{
@@ -252,6 +260,7 @@ func TestComputeSessions(t *testing.T) {
 	})
 
 	t.Run("1 hr inactivity between sessions", func(t *testing.T) {
+		ctx := context.Background()
 		t.Parallel()
 		playerUUID := domaintest.NewUUID(t)
 		start := time.Date(2021, time.January, 1, 0, 0, 0, 0, time.FixedZone("UTC", -3600*2))
@@ -264,7 +273,7 @@ func TestComputeSessions(t *testing.T) {
 		players[2] = domaintest.NewPlayerBuilder(playerUUID, start.Add(1*time.Hour).Add(45*time.Minute)).WithGamesPlayed(17).WithExperience(9_400).FromDB().Build()
 		players[3] = domaintest.NewPlayerBuilder(playerUUID, start.Add(2*time.Hour).Add(31*time.Minute)).WithGamesPlayed(18).WithExperience(10_800).FromDB().Build()
 
-		sessions := app.ComputeSessions(players, start, start.Add(24*time.Hour))
+		sessions := app.ComputeSessions(ctx, players, start, start.Add(24*time.Hour))
 
 		expectedSessions := []domain.Session{
 			{
@@ -282,6 +291,7 @@ func TestComputeSessions(t *testing.T) {
 	})
 
 	t.Run("sessions before and after", func(t *testing.T) {
+		ctx := context.Background()
 		t.Parallel()
 		playerUUID := domaintest.NewUUID(t)
 		start := time.Date(2021, time.January, 1, 0, 0, 0, 0, time.FixedZone("UTC", -3600*2))
@@ -299,13 +309,14 @@ func TestComputeSessions(t *testing.T) {
 		players[6] = domaintest.NewPlayerBuilder(playerUUID, start.Add(45*time.Hour).Add(5*time.Minute)).WithGamesPlayed(19).WithExperience(10_900).FromDB().Build()
 		players[7] = domaintest.NewPlayerBuilder(playerUUID, start.Add(45*time.Hour).Add(30*time.Minute)).WithGamesPlayed(20).WithExperience(11_900).FromDB().Build()
 
-		sessions := app.ComputeSessions(players, start, start.Add(24*time.Hour))
+		sessions := app.ComputeSessions(ctx, players, start, start.Add(24*time.Hour))
 
 		expectedSessions := []domain.Session{}
 		requireEqualSessions(t, expectedSessions, sessions)
 	})
 
 	t.Run("only xp change", func(t *testing.T) {
+		ctx := context.Background()
 		t.Parallel()
 		playerUUID := domaintest.NewUUID(t)
 		start := time.Date(2024, time.March, 24, 17, 37, 14, 987_654_321, time.FixedZone("UTC", 3600*9))
@@ -318,7 +329,7 @@ func TestComputeSessions(t *testing.T) {
 		players[2] = domaintest.NewPlayerBuilder(playerUUID, start.Add(1*time.Hour).Add(45*time.Minute)).WithGamesPlayed(16).WithExperience(9_400).FromDB().Build()
 		players[3] = domaintest.NewPlayerBuilder(playerUUID, start.Add(2*time.Hour).Add(31*time.Minute)).WithGamesPlayed(16).WithExperience(10_800).FromDB().Build()
 
-		sessions := app.ComputeSessions(players, start, start.Add(24*time.Hour))
+		sessions := app.ComputeSessions(ctx, players, start, start.Add(24*time.Hour))
 
 		expectedSessions := []domain.Session{
 			{
@@ -336,6 +347,7 @@ func TestComputeSessions(t *testing.T) {
 	})
 
 	t.Run("only games played change", func(t *testing.T) {
+		ctx := context.Background()
 		t.Parallel()
 		playerUUID := domaintest.NewUUID(t)
 		start := time.Date(2024, time.August, 2, 1, 47, 34, 987_654_321, time.FixedZone("UTC", 3600*3))
@@ -348,7 +360,7 @@ func TestComputeSessions(t *testing.T) {
 		players[2] = domaintest.NewPlayerBuilder(playerUUID, start.Add(1*time.Hour).Add(45*time.Minute)).WithGamesPlayed(17).WithExperience(9_200).FromDB().Build()
 		players[3] = domaintest.NewPlayerBuilder(playerUUID, start.Add(2*time.Hour).Add(31*time.Minute)).WithGamesPlayed(18).WithExperience(9_200).FromDB().Build()
 
-		sessions := app.ComputeSessions(players, start, start.Add(24*time.Hour))
+		sessions := app.ComputeSessions(ctx, players, start, start.Add(24*time.Hour))
 
 		expectedSessions := []domain.Session{
 			{
@@ -366,6 +378,7 @@ func TestComputeSessions(t *testing.T) {
 	})
 
 	t.Run("gaps in sessions", func(t *testing.T) {
+		ctx := context.Background()
 		t.Parallel()
 		playerUUID := domaintest.NewUUID(t)
 		start := time.Date(2022, time.November, 2, 13, 47, 34, 987_654_321, time.FixedZone("UTC", 3600*3))
@@ -393,7 +406,7 @@ func TestComputeSessions(t *testing.T) {
 
 		players[9] = domaintest.NewPlayerBuilder(playerUUID, start.Add(17*time.Hour).Add(15*time.Minute)).WithGamesPlayed(44).WithExperience(38_800).FromDB().Build()
 
-		sessions := app.ComputeSessions(players, start, start.Add(24*time.Hour))
+		sessions := app.ComputeSessions(ctx, players, start, start.Add(24*time.Hour))
 
 		expectedSessions := []domain.Session{
 			{
@@ -416,6 +429,7 @@ func TestComputeSessions(t *testing.T) {
 	})
 
 	t.Run("end", func(t *testing.T) {
+		ctx := context.Background()
 		t.Parallel()
 		playerUUID := domaintest.NewUUID(t)
 		start := time.Date(2025, time.December, 9, 14, 13, 34, 987_654_321, time.FixedZone("UTC", 3600*0))
@@ -425,7 +439,7 @@ func TestComputeSessions(t *testing.T) {
 		players[1] = domaintest.NewPlayerBuilder(playerUUID, start.Add(23*time.Hour).Add(40*time.Minute)).WithGamesPlayed(17).WithExperience(9_500).FromDB().Build()
 		players[2] = domaintest.NewPlayerBuilder(playerUUID, start.Add(24*time.Hour).Add(05*time.Minute)).WithGamesPlayed(18).WithExperience(9_900).FromDB().Build()
 
-		sessions := app.ComputeSessions(players, start, start.Add(24*time.Hour))
+		sessions := app.ComputeSessions(ctx, players, start, start.Add(24*time.Hour))
 
 		expectedSessions := []domain.Session{
 			{
@@ -438,6 +452,7 @@ func TestComputeSessions(t *testing.T) {
 	})
 
 	t.Run("mostly consecutive", func(t *testing.T) {
+		ctx := context.Background()
 		t.Parallel()
 		playerUUID := domaintest.NewUUID(t)
 		start := time.Date(2025, time.February, 7, 4, 13, 34, 987_654_321, time.FixedZone("UTC", 3600*-10))
@@ -450,7 +465,7 @@ func TestComputeSessions(t *testing.T) {
 		players[4] = domaintest.NewPlayerBuilder(playerUUID, start.Add(4*time.Hour).Add(55*time.Minute)).WithGamesPlayed(21).WithExperience(11_900).FromDB().Build()
 		players[5] = domaintest.NewPlayerBuilder(playerUUID, start.Add(5*time.Hour).Add(15*time.Minute)).WithGamesPlayed(22).WithExperience(12_900).FromDB().Build()
 
-		sessions := app.ComputeSessions(players, start, start.Add(24*time.Hour))
+		sessions := app.ComputeSessions(ctx, players, start, start.Add(24*time.Hour))
 
 		expectedSessions := []domain.Session{
 			{
@@ -463,6 +478,7 @@ func TestComputeSessions(t *testing.T) {
 	})
 
 	t.Run("short pauses", func(t *testing.T) {
+		ctx := context.Background()
 		t.Parallel()
 		playerUUID := domaintest.NewUUID(t)
 		start := time.Date(2025, time.December, 1, 7, 13, 34, 987_654_321, time.FixedZone("UTC", 3600*7))
@@ -475,7 +491,7 @@ func TestComputeSessions(t *testing.T) {
 		players[4] = domaintest.NewPlayerBuilder(playerUUID, start.Add(2*time.Hour).Add(55*time.Minute)).WithGamesPlayed(17).WithExperience(10_900).FromDB().Build()
 		players[5] = domaintest.NewPlayerBuilder(playerUUID, start.Add(3*time.Hour).Add(15*time.Minute)).WithGamesPlayed(17).WithExperience(11_900).FromDB().Build()
 
-		sessions := app.ComputeSessions(players, start, start.Add(24*time.Hour))
+		sessions := app.ComputeSessions(ctx, players, start, start.Add(24*time.Hour))
 
 		expectedSessions := []domain.Session{
 			{
@@ -488,6 +504,7 @@ func TestComputeSessions(t *testing.T) {
 	})
 
 	t.Run("2 gap -> still consecutive", func(t *testing.T) {
+		ctx := context.Background()
 		t.Parallel()
 		playerUUID := domaintest.NewUUID(t)
 		start := time.Date(2025, time.February, 7, 4, 13, 34, 987_654_321, time.FixedZone("UTC", 3600*-10))
@@ -500,7 +517,7 @@ func TestComputeSessions(t *testing.T) {
 		players[4] = domaintest.NewPlayerBuilder(playerUUID, start.Add(4*time.Hour).Add(55*time.Minute)).WithGamesPlayed(21).WithExperience(11_900).FromDB().Build()
 		players[5] = domaintest.NewPlayerBuilder(playerUUID, start.Add(5*time.Hour).Add(15*time.Minute)).WithGamesPlayed(22).WithExperience(12_900).FromDB().Build()
 
-		sessions := app.ComputeSessions(players, start, start.Add(24*time.Hour))
+		sessions := app.ComputeSessions(ctx, players, start, start.Add(24*time.Hour))
 
 		expectedSessions := []domain.Session{
 			{

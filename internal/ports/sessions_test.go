@@ -11,35 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Amund211/flashlight/internal/adapters/playerrepository"
 	"github.com/Amund211/flashlight/internal/app"
 	"github.com/Amund211/flashlight/internal/domain"
 	"github.com/Amund211/flashlight/internal/domaintest"
 	"github.com/Amund211/flashlight/internal/ports"
 	"github.com/stretchr/testify/require"
 )
-
-type mockPlayerRepository struct {
-	playerrepository.StubPlayerRepository
-	t             *testing.T
-	expectedUUID  string
-	expectedStart time.Time
-	expectedEnd   time.Time
-	stats         []domain.PlayerPIT
-	err           error
-	called        *bool
-}
-
-func (m *mockPlayerRepository) GetPlayerPITs(ctx context.Context, uuid string, start, end time.Time) ([]domain.PlayerPIT, error) {
-	require.Equal(m.t, m.expectedUUID, uuid)
-	// Account for the 24-hour padding
-	require.WithinDuration(m.t, m.expectedStart.Add(-24*time.Hour), start, 0)
-	require.WithinDuration(m.t, m.expectedEnd.Add(24*time.Hour), end, 0)
-
-	*m.called = true
-
-	return m.stats, m.err
-}
 
 func TestMakeGetSessionsHandler(t *testing.T) {
 	t.Parallel()
@@ -54,27 +31,24 @@ func TestMakeGetSessionsHandler(t *testing.T) {
 		}
 	}
 
-	makePlayerRepo := func(t *testing.T, expectedUUID string, expectedStart, expectedEnd time.Time, stats []domain.PlayerPIT, err error) (playerrepository.PlayerRepository, *bool) {
+	makeGetPlayerPITs := func(t *testing.T, expectedUUID string, expectedStart, expectedEnd time.Time, stats []domain.PlayerPIT, err error) (app.GetPlayerPITs, *bool) {
 		called := false
-		return &mockPlayerRepository{
-			t:             t,
-			expectedUUID:  expectedUUID,
-			expectedStart: expectedStart,
-			expectedEnd:   expectedEnd,
-			stats:         stats,
-			err:           err,
-			called:        &called,
+		return func(ctx context.Context, uuid string, start, end time.Time) ([]domain.PlayerPIT, error) {
+			t.Helper()
+			require.Equal(t, expectedUUID, uuid)
+			// Account for the 24-hour padding
+			require.WithinDuration(t, expectedStart.Add(-24*time.Hour), start, 0)
+			require.WithinDuration(t, expectedEnd.Add(24*time.Hour), end, 0)
+
+			called = true
+
+			return stats, err
 		}, &called
 	}
 
-	noopUpdatePlayerInInterval := func(ctx context.Context, uuid string, start, end time.Time) error {
-		return nil
-	}
-
-	makeGetSessionsHandler := func(playerRepo playerrepository.PlayerRepository, updatePlayerInInterval app.UpdatePlayerInInterval) http.HandlerFunc {
+	makeGetSessionsHandler := func(getPlayerPITs app.GetPlayerPITs) http.HandlerFunc {
 		return ports.MakeGetSessionsHandler(
-			playerRepo,
-			updatePlayerInInterval,
+			getPlayerPITs,
 			allowedOrigins,
 			testLogger,
 			noopMiddleware,
@@ -135,8 +109,8 @@ func TestMakeGetSessionsHandler(t *testing.T) {
 	t.Run("successful sessions retrieval", func(t *testing.T) {
 		t.Parallel()
 
-		playerRepo, called := makePlayerRepo(t, uuid, start, end, stats, nil)
-		handler := makeGetSessionsHandler(playerRepo, noopUpdatePlayerInInterval)
+		getPlayerPITs, called := makeGetPlayerPITs(t, uuid, start, end, stats, nil)
+		handler := makeGetSessionsHandler(getPlayerPITs)
 
 		req := makeRequest(uuid, startStr, endStr)
 		w := httptest.NewRecorder()
@@ -157,8 +131,8 @@ func TestMakeGetSessionsHandler(t *testing.T) {
 		end := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
 		endStr := "2023-01-01T00:00:00Z"
 
-		playerRepo, called := makePlayerRepo(t, uuid, start, end, stats, nil)
-		handler := makeGetSessionsHandler(playerRepo, noopUpdatePlayerInInterval)
+		getPlayerPITs, called := makeGetPlayerPITs(t, uuid, start, end, stats, nil)
+		handler := makeGetSessionsHandler(getPlayerPITs)
 
 		req := makeRequest(uuid, startStr, endStr)
 		w := httptest.NewRecorder()
@@ -174,8 +148,8 @@ func TestMakeGetSessionsHandler(t *testing.T) {
 	t.Run("invalid UUID format", func(t *testing.T) {
 		t.Parallel()
 
-		playerRepo, called := makePlayerRepo(t, uuid, start, end, stats, nil)
-		handler := makeGetSessionsHandler(playerRepo, noopUpdatePlayerInInterval)
+		getPlayerPITs, called := makeGetPlayerPITs(t, uuid, start, end, stats, nil)
+		handler := makeGetSessionsHandler(getPlayerPITs)
 
 		req := makeRequest("invalid-uuid", startStr, endStr)
 		w := httptest.NewRecorder()
@@ -190,8 +164,8 @@ func TestMakeGetSessionsHandler(t *testing.T) {
 	t.Run("start time after end time", func(t *testing.T) {
 		t.Parallel()
 
-		playerRepo, called := makePlayerRepo(t, uuid, start, end, stats, nil)
-		handler := makeGetSessionsHandler(playerRepo, noopUpdatePlayerInInterval)
+		getPlayerPITs, called := makeGetPlayerPITs(t, uuid, start, end, stats, nil)
+		handler := makeGetSessionsHandler(getPlayerPITs)
 
 		req := makeRequest(uuid, "2023-01-01T00:00:00.000000001Z", "2023-01-01T00:00:00.000000000Z")
 		w := httptest.NewRecorder()
@@ -211,8 +185,8 @@ func TestMakeGetSessionsHandler(t *testing.T) {
 		end := start.Add(400 * 24 * time.Hour)
 		endStr := end.Format(time.RFC3339)
 
-		playerRepo, called := makePlayerRepo(t, uuid, start, end, stats, nil)
-		handler := makeGetSessionsHandler(playerRepo, noopUpdatePlayerInInterval)
+		getPlayerPITs, called := makeGetPlayerPITs(t, uuid, start, end, stats, nil)
+		handler := makeGetSessionsHandler(getPlayerPITs)
 
 		req := makeRequest(uuid, startStr, endStr)
 		w := httptest.NewRecorder()
@@ -232,8 +206,8 @@ func TestMakeGetSessionsHandler(t *testing.T) {
 		end := start.Add(401 * 24 * time.Hour)
 		endStr := end.Format(time.RFC3339)
 
-		playerRepo, called := makePlayerRepo(t, uuid, start, end, stats, nil)
-		handler := makeGetSessionsHandler(playerRepo, noopUpdatePlayerInInterval)
+		getPlayerPITs, called := makeGetPlayerPITs(t, uuid, start, end, stats, nil)
+		handler := makeGetSessionsHandler(getPlayerPITs)
 
 		req := makeRequest(uuid, startStr, endStr)
 		w := httptest.NewRecorder()
@@ -253,8 +227,8 @@ func TestMakeGetSessionsHandler(t *testing.T) {
 		end := start.Add(399*24*time.Hour + 23*time.Hour + 59*time.Minute + 59*time.Second)
 		endStr := end.Format(time.RFC3339)
 
-		playerRepo, called := makePlayerRepo(t, uuid, start, end, stats, nil)
-		handler := makeGetSessionsHandler(playerRepo, noopUpdatePlayerInInterval)
+		getPlayerPITs, called := makeGetPlayerPITs(t, uuid, start, end, stats, nil)
+		handler := makeGetSessionsHandler(getPlayerPITs)
 
 		req := makeRequest(uuid, startStr, endStr)
 		w := httptest.NewRecorder()
