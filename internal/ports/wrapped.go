@@ -17,22 +17,22 @@ import (
 )
 
 type wrappedResponse struct {
-	Success          bool                   `json:"success"`
-	UUID             string                 `json:"uuid,omitempty"`
-	Year             int                    `json:"year,omitempty"`
-	TotalSessions    int                    `json:"totalSessions"`
-	LongestSession   *wrappedSessionSummary `json:"longestSession,omitempty"`
-	HighestFKDR      *wrappedSessionSummary `json:"highestFKDR,omitempty"`
-	TotalStats       *wrappedStats          `json:"totalStats,omitempty"`
-	Cause            string                 `json:"cause,omitempty"`
+	Success        bool                   `json:"success"`
+	UUID           string                 `json:"uuid,omitempty"`
+	Year           int                    `json:"year,omitempty"`
+	TotalSessions  int                    `json:"totalSessions"`
+	LongestSession *wrappedSessionSummary `json:"longestSession,omitempty"`
+	HighestFKDR    *wrappedSessionSummary `json:"highestFKDR,omitempty"`
+	TotalStats     *wrappedStats          `json:"totalStats,omitempty"`
+	Cause          string                 `json:"cause,omitempty"`
 }
 
 type wrappedSessionSummary struct {
-	Start       time.Time     `json:"start"`
-	End         time.Time     `json:"end"`
-	Duration    float64       `json:"durationHours"`
-	Stats       wrappedStats  `json:"stats"`
-	FKDR        *float64      `json:"fkdr,omitempty"`
+	Start    time.Time    `json:"start"`
+	End      time.Time    `json:"end"`
+	Duration float64      `json:"durationHours"`
+	Stats    wrappedStats `json:"stats"`
+	FKDR     *float64     `json:"fkdr,omitempty"`
 }
 
 type wrappedStats struct {

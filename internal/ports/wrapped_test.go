@@ -155,9 +155,9 @@ func TestMakeGetWrappedHandler(t *testing.T) {
 		// Verify total stats
 		totalStats := response["totalStats"].(map[string]interface{})
 		require.NotNil(t, totalStats)
-		require.Equal(t, float64(30), totalStats["finalKills"])  // 10 + 20
-		require.Equal(t, float64(6), totalStats["finalDeaths"])  // 5 + 1
-		require.Equal(t, float64(15), totalStats["wins"])        // 5 + 10
+		require.Equal(t, float64(30), totalStats["finalKills"]) // 10 + 20
+		require.Equal(t, float64(6), totalStats["finalDeaths"]) // 5 + 1
+		require.Equal(t, float64(15), totalStats["wins"])       // 5 + 10
 	})
 
 	t.Run("empty sessions", func(t *testing.T) {
