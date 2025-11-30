@@ -123,7 +123,7 @@ func TestMakeGetWrappedHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, false, response["success"])
-		require.Equal(t, "Invalid UUID", response["cause"])
+		require.Equal(t, "invalid uuid", response["cause"])
 	})
 
 	t.Run("invalid year format", func(t *testing.T) {
@@ -145,7 +145,7 @@ func TestMakeGetWrappedHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, false, response["success"])
-		require.Equal(t, "Invalid year", response["cause"])
+		require.Equal(t, "invalid year", response["cause"])
 	})
 
 	t.Run("year out of range", func(t *testing.T) {
@@ -167,6 +167,6 @@ func TestMakeGetWrappedHandler(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, false, response["success"])
-		require.Equal(t, "Invalid year", response["cause"])
+		require.Equal(t, "invalid year", response["cause"])
 	})
 }

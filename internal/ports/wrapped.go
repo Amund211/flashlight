@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 	"time"
 
@@ -197,7 +198,7 @@ func MakeGetWrappedHandler(
 			statusCode := http.StatusBadRequest
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(statusCode)
-			w.Write([]byte(`{"success":false,"cause":"Invalid UUID"}`))
+			w.Write([]byte(`{"success":false,"cause":"invalid uuid"}`))
 			return
 		}
 
@@ -206,7 +207,7 @@ func MakeGetWrappedHandler(
 			statusCode := http.StatusBadRequest
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(statusCode)
-			w.Write([]byte(`{"success":false,"cause":"Invalid year"}`))
+			w.Write([]byte(`{"success":false,"cause":"invalid year"}`))
 			return
 		}
 
@@ -767,6 +768,10 @@ func computeCoverage(ctx context.Context, playerPITs []domain.PlayerPIT, session
 	adjustedHours := sessionDuration
 	if coverage > 0 && coverage < 100 {
 		adjustedHours = sessionDuration / (coverage / 100)
+	} else if coverage > 100 {
+		// Coverage exceeded 100%, likely due to data inconsistency
+		// Keep sessionDuration as-is
+		adjustedHours = sessionDuration
 	}
 
 	return &coverageStats{
@@ -834,14 +839,15 @@ func computeFavoritePlayIntervals(ctx context.Context, sessions []domain.Session
 		}
 	}
 
-	// Sort by percentage
-	for i := 0; i < len(intervals); i++ {
-		for j := i + 1; j < len(intervals); j++ {
-			if intervals[j].percentage > intervals[i].percentage {
-				intervals[i], intervals[j] = intervals[j], intervals[i]
-			}
+	// Sort by percentage (descending)
+	slices.SortFunc(intervals, func(a, b interval) int {
+		if a.percentage > b.percentage {
+			return -1
+		} else if a.percentage < b.percentage {
+			return 1
 		}
-	}
+		return 0
+	})
 
 	// Take top 3
 	result := []playIntervalStats{}
@@ -865,7 +871,7 @@ func computeFlawlessSessions(ctx context.Context, sessions []domain.Session) *fl
 	flawlessCount := 0
 	for _, session := range sessions {
 		stats := calculateSessionStats(session.Start.Overall, session.End.Overall)
-		if stats.Losses == 0 && stats.FinalDeaths == 0 {
+		if stats.Losses == 0 && stats.FinalDeaths == 0 && stats.Wins > 0 {
 			flawlessCount++
 		}
 	}
