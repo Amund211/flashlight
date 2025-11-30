@@ -19,6 +19,11 @@ func (pb *playerBuilder) WithGamesPlayed(gamesPlayed int) *playerBuilder {
 	return pb
 }
 
+func (pb *playerBuilder) WithQueriedAt(queriedAt time.Time) *playerBuilder {
+	pb.player.QueriedAt = queriedAt
+	return pb
+}
+
 func (pb *playerBuilder) WithExperience(exp int64) *playerBuilder {
 	pb.player.Experience = exp
 	return pb
@@ -73,8 +78,33 @@ func (sb *statsBuilder) WithGamesPlayed(gamesPlayed int) *statsBuilder {
 	return sb
 }
 
+func (sb *statsBuilder) WithWins(wins int) *statsBuilder {
+	sb.stats.Wins = wins
+	return sb
+}
+
+func (sb *statsBuilder) WithLosses(losses int) *statsBuilder {
+	sb.stats.Losses = losses
+	return sb
+}
+
 func (sb *statsBuilder) WithFinalKills(finalKills int) *statsBuilder {
 	sb.stats.FinalKills = finalKills
+	return sb
+}
+
+func (sb *statsBuilder) WithFinalDeaths(finalDeaths int) *statsBuilder {
+	sb.stats.FinalDeaths = finalDeaths
+	return sb
+}
+
+func (sb *statsBuilder) WithKills(kills int) *statsBuilder {
+	sb.stats.Kills = kills
+	return sb
+}
+
+func (sb *statsBuilder) WithDeaths(deaths int) *statsBuilder {
+	sb.stats.Deaths = deaths
 	return sb
 }
 
