@@ -860,3 +860,180 @@ func float64Ptr(f float64) *float64 {
 func intPtr(i int) *int {
 	return &i
 }
+
+func TestComputePlaytimeDistribution(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	playerUUID := domaintest.NewUUID(t)
+
+	tests := []struct {
+		name                    string
+		sessions                []domain.Session
+		wantHourlyDistribution  [24]float64
+		wantDayHourDistribution [168]float64
+		wantNil                 bool
+	}{
+		{
+			name:     "empty sessions",
+			sessions: []domain.Session{},
+			wantNil:  true,
+		},
+		{
+			name: "single session within one hour",
+			sessions: []domain.Session{
+				{
+					Start: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 10, 0, 0, 0, time.UTC)).
+						WithOverallStats(domaintest.NewStatsBuilder().WithGamesPlayed(0).Build()).
+						Build(),
+					End: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 10, 30, 0, 0, time.UTC)).
+						WithOverallStats(domaintest.NewStatsBuilder().WithGamesPlayed(1).Build()).
+						Build(),
+				},
+			},
+			wantHourlyDistribution: func() [24]float64 {
+				var arr [24]float64
+				arr[10] = 0.5 // 30 minutes = 0.5 hours at hour 10
+				return arr
+			}(),
+			wantDayHourDistribution: func() [168]float64 {
+				var arr [168]float64
+				// January 1, 2023 is a Sunday (weekday 0)
+				arr[0*24+10] = 0.5 // Sunday, hour 10
+				return arr
+			}(),
+		},
+		{
+			name: "single session spanning two hours",
+			sessions: []domain.Session{
+				{
+					Start: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 2, 14, 0, 0, 0, time.UTC)).
+						WithOverallStats(domaintest.NewStatsBuilder().WithGamesPlayed(0).Build()).
+						Build(),
+					End: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 2, 16, 0, 0, 0, time.UTC)).
+						WithOverallStats(domaintest.NewStatsBuilder().WithGamesPlayed(1).Build()).
+						Build(),
+				},
+			},
+			wantHourlyDistribution: func() [24]float64 {
+				var arr [24]float64
+				arr[14] = 1.0 // hour 14: full hour
+				arr[15] = 1.0 // hour 15: full hour
+				return arr
+			}(),
+			wantDayHourDistribution: func() [168]float64 {
+				var arr [168]float64
+				// January 2, 2023 is a Monday (weekday 1)
+				arr[1*24+14] = 1.0 // Monday, hour 14
+				arr[1*24+15] = 1.0 // Monday, hour 15
+				return arr
+			}(),
+		},
+		{
+			name: "session spanning partial hours",
+			sessions: []domain.Session{
+				{
+					Start: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 3, 9, 30, 0, 0, time.UTC)).
+						WithOverallStats(domaintest.NewStatsBuilder().WithGamesPlayed(0).Build()).
+						Build(),
+					End: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 3, 11, 45, 0, 0, time.UTC)).
+						WithOverallStats(domaintest.NewStatsBuilder().WithGamesPlayed(1).Build()).
+						Build(),
+				},
+			},
+			wantHourlyDistribution: func() [24]float64 {
+				var arr [24]float64
+				arr[9] = 0.5   // 9:30-10:00 = 30 min = 0.5 hours
+				arr[10] = 1.0  // 10:00-11:00 = 1 hour
+				arr[11] = 0.75 // 11:00-11:45 = 45 min = 0.75 hours
+				return arr
+			}(),
+			wantDayHourDistribution: func() [168]float64 {
+				var arr [168]float64
+				// January 3, 2023 is a Tuesday (weekday 2)
+				arr[2*24+9] = 0.5   // Tuesday, hour 9
+				arr[2*24+10] = 1.0  // Tuesday, hour 10
+				arr[2*24+11] = 0.75 // Tuesday, hour 11
+				return arr
+			}(),
+		},
+		{
+			name: "multiple sessions on different days",
+			sessions: []domain.Session{
+				{
+					// Sunday session
+					Start: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 10, 0, 0, 0, time.UTC)).
+						WithOverallStats(domaintest.NewStatsBuilder().WithGamesPlayed(0).Build()).
+						Build(),
+					End: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 12, 0, 0, 0, time.UTC)).
+						WithOverallStats(domaintest.NewStatsBuilder().WithGamesPlayed(1).Build()).
+						Build(),
+				},
+				{
+					// Monday session at the same hour
+					Start: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 2, 10, 0, 0, 0, time.UTC)).
+						WithOverallStats(domaintest.NewStatsBuilder().WithGamesPlayed(1).Build()).
+						Build(),
+					End: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 2, 11, 0, 0, 0, time.UTC)).
+						WithOverallStats(domaintest.NewStatsBuilder().WithGamesPlayed(2).Build()).
+						Build(),
+				},
+			},
+			wantHourlyDistribution: func() [24]float64 {
+				var arr [24]float64
+				arr[10] = 2.0 // 1 hour on Sunday + 1 hour on Monday
+				arr[11] = 1.0 // 1 hour on Sunday
+				return arr
+			}(),
+			wantDayHourDistribution: func() [168]float64 {
+				var arr [168]float64
+				// Sunday (weekday 0)
+				arr[0*24+10] = 1.0 // Sunday, hour 10-11
+				arr[0*24+11] = 1.0 // Sunday, hour 11-12
+				// Monday (weekday 1)
+				arr[1*24+10] = 1.0 // Monday, hour 10-11
+				return arr
+			}(),
+		},
+		{
+			name: "session crossing midnight",
+			sessions: []domain.Session{
+				{
+					Start: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 23, 0, 0, 0, time.UTC)).
+						WithOverallStats(domaintest.NewStatsBuilder().WithGamesPlayed(0).Build()).
+						Build(),
+					End: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 2, 1, 0, 0, 0, time.UTC)).
+						WithOverallStats(domaintest.NewStatsBuilder().WithGamesPlayed(1).Build()).
+						Build(),
+				},
+			},
+			wantHourlyDistribution: func() [24]float64 {
+				var arr [24]float64
+				arr[23] = 1.0 // hour 23 (Sunday)
+				arr[0] = 1.0  // hour 0 (Monday)
+				return arr
+			}(),
+			wantDayHourDistribution: func() [168]float64 {
+				var arr [168]float64
+				// January 1, 2023 is Sunday (weekday 0)
+				arr[0*24+23] = 1.0 // Sunday, hour 23
+				// January 2, 2023 is Monday (weekday 1)
+				arr[1*24+0] = 1.0 // Monday, hour 0
+				return arr
+			}(),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := computePlaytimeDistribution(ctx, tt.sessions)
+			if tt.wantNil {
+				require.Nil(t, got)
+			} else {
+				require.NotNil(t, got)
+				require.Equal(t, tt.wantHourlyDistribution, got.HourlyDistribution, "hourly distribution mismatch")
+				require.Equal(t, tt.wantDayHourDistribution, got.DayHourDistribution, "day-hour distribution mismatch")
+			}
+		})
+	}
+}
