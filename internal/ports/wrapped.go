@@ -19,22 +19,23 @@ import (
 )
 
 type wrappedResponse struct {
-	Success                bool                  `json:"success"`
-	UUID                   string                `json:"uuid,omitempty"`
-	Year                   int                   `json:"year,omitempty"`
-	TotalSessions          int                   `json:"totalSessions"`
-	NonConsecutiveSessions int                   `json:"nonConsecutiveSessions"`
-	SessionLengths         *sessionLengthStats   `json:"sessionLengths,omitempty"`
-	SessionsPerMonth       map[int]int           `json:"sessionsPerMonth,omitempty"`
-	BestSessions           *bestSessionsStats    `json:"bestSessions,omitempty"`
-	Averages               *averageStats         `json:"averages,omitempty"`
-	YearStats              *yearBoundaryStats    `json:"yearStats,omitempty"`
-	Winstreaks             *winstreakStats       `json:"winstreaks,omitempty"`
-	FinalKillStreaks       *finalKillStreakStats `json:"finalKillStreaks,omitempty"`
-	SessionCoverage        *coverageStats        `json:"sessionCoverage,omitempty"`
-	FavoritePlayIntervals  []playIntervalStats   `json:"favoritePlayIntervals,omitempty"`
-	FlawlessSessions       *flawlessSessionStats `json:"flawlessSessions,omitempty"`
-	Cause                  string                `json:"cause,omitempty"`
+	Success                bool                       `json:"success"`
+	UUID                   string                     `json:"uuid,omitempty"`
+	Year                   int                        `json:"year,omitempty"`
+	TotalSessions          int                        `json:"totalSessions"`
+	NonConsecutiveSessions int                        `json:"nonConsecutiveSessions"`
+	SessionLengths         *sessionLengthStats        `json:"sessionLengths,omitempty"`
+	SessionsPerMonth       map[int]int                `json:"sessionsPerMonth,omitempty"`
+	BestSessions           *bestSessionsStats         `json:"bestSessions,omitempty"`
+	Averages               *averageStats              `json:"averages,omitempty"`
+	YearStats              *yearBoundaryStats         `json:"yearStats,omitempty"`
+	Winstreaks             *winstreakStats            `json:"winstreaks,omitempty"`
+	FinalKillStreaks       *finalKillStreakStats      `json:"finalKillStreaks,omitempty"`
+	SessionCoverage        *coverageStats             `json:"sessionCoverage,omitempty"`
+	FavoritePlayIntervals  []playIntervalStats        `json:"favoritePlayIntervals,omitempty"`
+	FlawlessSessions       *flawlessSessionStats      `json:"flawlessSessions,omitempty"`
+	PlaytimeDistribution   *playtimeDistributionStats `json:"playtimeDistribution,omitempty"`
+	Cause                  string                     `json:"cause,omitempty"`
 }
 
 type sessionLengthStats struct {
@@ -126,6 +127,17 @@ type playIntervalStats struct {
 type flawlessSessionStats struct {
 	Count      int     `json:"count"`
 	Percentage float64 `json:"percentage"`
+}
+
+type playtimeDistributionStats struct {
+	// Hours: Array of 24 elements (index 0-23) representing UTC hours
+	// Each element contains the total hours played during that UTC hour
+	HourlyDistribution [24]float64 `json:"hourlyDistribution"`
+
+	// DayHourDistribution: Array of 7*24 = 168 elements
+	// Index formula: day * 24 + hour (where day: 0=Sunday, 1=Monday, etc., hour: 0-23 UTC)
+	// Each element contains the total hours played during that UTC hour on that UTC day
+	DayHourDistribution [168]float64 `json:"dayHourDistribution"`
 }
 
 func MakeGetWrappedHandler(
@@ -313,6 +325,7 @@ func computeWrappedStats(ctx context.Context, playerPITs []domain.PlayerPIT, ses
 	response.SessionCoverage = computeCoverage(ctx, playerPITs, consecutiveSessions, year)
 	response.FavoritePlayIntervals = computeFavoritePlayIntervals(ctx, consecutiveSessions)
 	response.FlawlessSessions = computeFlawlessSessions(ctx, consecutiveSessions)
+	response.PlaytimeDistribution = computePlaytimeDistribution(ctx, consecutiveSessions)
 
 	return response
 }
@@ -881,5 +894,52 @@ func computeFlawlessSessions(ctx context.Context, sessions []domain.Session) *fl
 	return &flawlessSessionStats{
 		Count:      flawlessCount,
 		Percentage: percentage,
+	}
+}
+
+// computePlaytimeDistribution calculates the distribution of playtime across UTC hours and day-hours
+func computePlaytimeDistribution(ctx context.Context, sessions []domain.Session) *playtimeDistributionStats {
+	if len(sessions) == 0 {
+		return nil
+	}
+
+	var hourlyDistribution [24]float64
+	var dayHourDistribution [168]float64
+
+	for _, session := range sessions {
+		start := session.Start.QueriedAt
+		end := session.End.QueriedAt
+
+		// Distribute session time across hour buckets
+		currentTime := start
+		for currentTime.Before(end) {
+			hour := currentTime.Hour()
+			weekday := int(currentTime.Weekday()) // 0 = Sunday, 1 = Monday, etc.
+			dayHourIndex := weekday*24 + hour
+
+			// Calculate the end of the current hour
+			nextHour := time.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), currentTime.Hour(), 0, 0, 0, currentTime.Location()).Add(time.Hour)
+
+			// Determine how much time to add for this hour bucket
+			var hoursToAdd float64
+			if end.Before(nextHour) {
+				// Session ends before the next hour boundary
+				hoursToAdd = end.Sub(currentTime).Hours()
+			} else {
+				// Session continues into next hour
+				hoursToAdd = nextHour.Sub(currentTime).Hours()
+			}
+
+			hourlyDistribution[hour] += hoursToAdd
+			dayHourDistribution[dayHourIndex] += hoursToAdd
+
+			// Move to the next hour boundary
+			currentTime = nextHour
+		}
+	}
+
+	return &playtimeDistributionStats{
+		HourlyDistribution:  hourlyDistribution,
+		DayHourDistribution: dayHourDistribution,
 	}
 }
