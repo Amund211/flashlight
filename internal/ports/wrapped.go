@@ -219,13 +219,13 @@ func MakeGetWrappedHandler(
 			slog.Int("parsedYear", year),
 		)
 
-		// Calculate start and end times for the year
-		// Add 24 hour padding as per existing pattern
-		start := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC).Add(-24 * time.Hour)
-		end := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC).Add(-time.Nanosecond).Add(24 * time.Hour)
+		yearStart := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+		yearEnd := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC).Add(-time.Nanosecond)
 
-		// Get player PITs for the year
-		playerPITs, err := getPlayerPITs(ctx, uuid, start, end)
+		// NOTE: 24-hour padding to ensure we can complete sessions at year boundaries
+		playerPITsStart := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC).Add(-24 * time.Hour)
+		playerPITsEnd := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC).Add(-time.Nanosecond).Add(24 * time.Hour)
+		playerPITs, err := getPlayerPITs(ctx, uuid, playerPITsStart, playerPITsEnd)
 		if err != nil {
 			// NOTE: GetPlayerPITs implementations handle their own error reporting
 			statusCode := http.StatusInternalServerError
@@ -236,8 +236,6 @@ func MakeGetWrappedHandler(
 		}
 
 		// Compute sessions from player PITs
-		yearStart := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
-		yearEnd := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC).Add(-time.Nanosecond)
 		sessions := app.ComputeSessions(ctx, playerPITs, yearStart, yearEnd)
 
 		// Compute wrapped statistics
