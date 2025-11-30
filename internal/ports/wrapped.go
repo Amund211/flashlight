@@ -134,10 +134,10 @@ type playtimeDistributionStats struct {
 	// Each element contains the total hours played during that UTC hour
 	HourlyDistribution [24]float64 `json:"hourlyDistribution"`
 
-	// DayHourDistribution: Array of 7*24 = 168 elements
-	// Index formula: day * 24 + hour (where day: 0=Sunday, 1=Monday, etc., hour: 0-23 UTC)
-	// Each element contains the total hours played during that UTC hour on that UTC day
-	DayHourDistribution [168]float64 `json:"dayHourDistribution"`
+	// DayHourDistribution: Map from weekday name (e.g., "Monday", "Tuesday") to hourly distribution
+	// Each value is an array of 24 elements (index 0-23) for UTC hours on that day
+	// Keys are from time.Weekday.String(): "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
+	DayHourDistribution map[string][24]float64 `json:"dayHourDistribution"`
 }
 
 func MakeGetWrappedHandler(
@@ -904,7 +904,7 @@ func computePlaytimeDistribution(ctx context.Context, sessions []domain.Session)
 	}
 
 	var hourlyDistribution [24]float64
-	var dayHourDistribution [168]float64
+	dayHourDistribution := make(map[string][24]float64)
 
 	for _, session := range sessions {
 		start := session.Start.QueriedAt
@@ -914,8 +914,7 @@ func computePlaytimeDistribution(ctx context.Context, sessions []domain.Session)
 		currentTime := start
 		for currentTime.Before(end) {
 			hour := currentTime.Hour()
-			weekday := int(currentTime.Weekday()) // 0 = Sunday, 1 = Monday, etc.
-			dayHourIndex := weekday*24 + hour
+			weekdayName := currentTime.Weekday().String()
 
 			// Calculate the end of the current hour
 			nextHour := time.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), currentTime.Hour(), 0, 0, 0, currentTime.Location()).Add(time.Hour)
@@ -931,7 +930,11 @@ func computePlaytimeDistribution(ctx context.Context, sessions []domain.Session)
 			}
 
 			hourlyDistribution[hour] += hoursToAdd
-			dayHourDistribution[dayHourIndex] += hoursToAdd
+
+			// Get or create the hourly distribution for this weekday
+			dayHours := dayHourDistribution[weekdayName]
+			dayHours[hour] += hoursToAdd
+			dayHourDistribution[weekdayName] = dayHours
 
 			// Move to the next hour boundary
 			currentTime = nextHour
