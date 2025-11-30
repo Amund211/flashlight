@@ -870,7 +870,7 @@ func TestComputePlaytimeDistribution(t *testing.T) {
 		name                    string
 		sessions                []domain.Session
 		wantHourlyDistribution  [24]float64
-		wantDayHourDistribution [168]float64
+		wantDayHourDistribution map[string][24]float64
 		wantNil                 bool
 	}{
 		{
@@ -895,12 +895,14 @@ func TestComputePlaytimeDistribution(t *testing.T) {
 				arr[10] = 0.5 // 30 minutes = 0.5 hours at hour 10
 				return arr
 			}(),
-			wantDayHourDistribution: func() [168]float64 {
-				var arr [168]float64
-				// January 1, 2023 is a Sunday (weekday 0)
-				arr[0*24+10] = 0.5 // Sunday, hour 10
-				return arr
-			}(),
+			wantDayHourDistribution: map[string][24]float64{
+				"Sunday": {
+					0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0,
+					10: 0.5, // 30 minutes at hour 10
+					11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0, 17: 0, 18: 0, 19: 0,
+					20: 0, 21: 0, 22: 0, 23: 0,
+				},
+			},
 		},
 		{
 			name: "single session spanning two hours",
@@ -920,13 +922,16 @@ func TestComputePlaytimeDistribution(t *testing.T) {
 				arr[15] = 1.0 // hour 15: full hour
 				return arr
 			}(),
-			wantDayHourDistribution: func() [168]float64 {
-				var arr [168]float64
-				// January 2, 2023 is a Monday (weekday 1)
-				arr[1*24+14] = 1.0 // Monday, hour 14
-				arr[1*24+15] = 1.0 // Monday, hour 15
-				return arr
-			}(),
+			wantDayHourDistribution: map[string][24]float64{
+				"Monday": {
+					0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0,
+					10: 0, 11: 0, 12: 0, 13: 0,
+					14: 1.0, // full hour
+					15: 1.0, // full hour
+					16: 0, 17: 0, 18: 0, 19: 0,
+					20: 0, 21: 0, 22: 0, 23: 0,
+				},
+			},
 		},
 		{
 			name: "session spanning partial hours",
@@ -947,14 +952,16 @@ func TestComputePlaytimeDistribution(t *testing.T) {
 				arr[11] = 0.75 // 11:00-11:45 = 45 min = 0.75 hours
 				return arr
 			}(),
-			wantDayHourDistribution: func() [168]float64 {
-				var arr [168]float64
-				// January 3, 2023 is a Tuesday (weekday 2)
-				arr[2*24+9] = 0.5   // Tuesday, hour 9
-				arr[2*24+10] = 1.0  // Tuesday, hour 10
-				arr[2*24+11] = 0.75 // Tuesday, hour 11
-				return arr
-			}(),
+			wantDayHourDistribution: map[string][24]float64{
+				"Tuesday": {
+					0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0,
+					9:  0.5,  // 30 minutes
+					10: 1.0,  // full hour
+					11: 0.75, // 45 minutes
+					12: 0, 13: 0, 14: 0, 15: 0, 16: 0, 17: 0, 18: 0, 19: 0,
+					20: 0, 21: 0, 22: 0, 23: 0,
+				},
+			},
 		},
 		{
 			name: "multiple sessions on different days",
@@ -984,15 +991,21 @@ func TestComputePlaytimeDistribution(t *testing.T) {
 				arr[11] = 1.0 // 1 hour on Sunday
 				return arr
 			}(),
-			wantDayHourDistribution: func() [168]float64 {
-				var arr [168]float64
-				// Sunday (weekday 0)
-				arr[0*24+10] = 1.0 // Sunday, hour 10-11
-				arr[0*24+11] = 1.0 // Sunday, hour 11-12
-				// Monday (weekday 1)
-				arr[1*24+10] = 1.0 // Monday, hour 10-11
-				return arr
-			}(),
+			wantDayHourDistribution: map[string][24]float64{
+				"Sunday": {
+					0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0,
+					10: 1.0, // 1 hour
+					11: 1.0, // 1 hour
+					12: 0, 13: 0, 14: 0, 15: 0, 16: 0, 17: 0, 18: 0, 19: 0,
+					20: 0, 21: 0, 22: 0, 23: 0,
+				},
+				"Monday": {
+					0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0,
+					10: 1.0, // 1 hour
+					11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0, 17: 0, 18: 0, 19: 0,
+					20: 0, 21: 0, 22: 0, 23: 0,
+				},
+			},
 		},
 		{
 			name: "session crossing midnight",
@@ -1012,14 +1025,20 @@ func TestComputePlaytimeDistribution(t *testing.T) {
 				arr[0] = 1.0  // hour 0 (Monday)
 				return arr
 			}(),
-			wantDayHourDistribution: func() [168]float64 {
-				var arr [168]float64
-				// January 1, 2023 is Sunday (weekday 0)
-				arr[0*24+23] = 1.0 // Sunday, hour 23
-				// January 2, 2023 is Monday (weekday 1)
-				arr[1*24+0] = 1.0 // Monday, hour 0
-				return arr
-			}(),
+			wantDayHourDistribution: map[string][24]float64{
+				"Sunday": {
+					0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0,
+					10: 0, 11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0, 17: 0, 18: 0, 19: 0,
+					20: 0, 21: 0, 22: 0,
+					23: 1.0, // 1 hour
+				},
+				"Monday": {
+					0: 1.0, // 1 hour
+					1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0,
+					10: 0, 11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0, 17: 0, 18: 0, 19: 0,
+					20: 0, 21: 0, 22: 0, 23: 0,
+				},
+			},
 		},
 	}
 
