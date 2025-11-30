@@ -649,11 +649,11 @@ func TestComputeWinstreaks(t *testing.T) {
 			name: "winstreak of 5 then loss",
 			playerPITs: []domain.PlayerPIT{
 				domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 10, 0, 0, 0, time.UTC)).
-					WithOverallStats(domaintest.NewStatsBuilder().WithWins(0).WithLosses(0).Build()).Build(),
+					WithOverallStats(domaintest.NewStatsBuilder().WithWins(100).WithLosses(0).Build()).Build(),
 				domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 11, 0, 0, 0, time.UTC)).
-					WithOverallStats(domaintest.NewStatsBuilder().WithWins(5).WithLosses(0).Build()).Build(),
+					WithOverallStats(domaintest.NewStatsBuilder().WithWins(105).WithLosses(0).Build()).Build(),
 				domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 12, 0, 0, 0, time.UTC)).
-					WithOverallStats(domaintest.NewStatsBuilder().WithWins(5).WithLosses(1).Build()).Build(),
+					WithOverallStats(domaintest.NewStatsBuilder().WithWins(105).WithLosses(1).Build()).Build(),
 			},
 			wantOverallHigh: 5,
 		},
@@ -724,11 +724,11 @@ func TestComputeFinalKillStreaks(t *testing.T) {
 			name: "final kill streak of 8 then death",
 			playerPITs: []domain.PlayerPIT{
 				domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 10, 0, 0, 0, time.UTC)).
-					WithOverallStats(domaintest.NewStatsBuilder().WithFinalKills(0).WithFinalDeaths(0).Build()).Build(),
+					WithOverallStats(domaintest.NewStatsBuilder().WithFinalKills(100).WithFinalDeaths(0).Build()).Build(),
 				domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 11, 0, 0, 0, time.UTC)).
-					WithOverallStats(domaintest.NewStatsBuilder().WithFinalKills(8).WithFinalDeaths(0).Build()).Build(),
+					WithOverallStats(domaintest.NewStatsBuilder().WithFinalKills(108).WithFinalDeaths(0).Build()).Build(),
 				domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 12, 0, 0, 0, time.UTC)).
-					WithOverallStats(domaintest.NewStatsBuilder().WithFinalKills(8).WithFinalDeaths(1).Build()).Build(),
+					WithOverallStats(domaintest.NewStatsBuilder().WithFinalKills(108).WithFinalDeaths(1).Build()).Build(),
 			},
 			wantOverallHigh: 8,
 		},
