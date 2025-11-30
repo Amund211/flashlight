@@ -166,20 +166,20 @@ func TestComputeFlawlessSessions(t *testing.T) {
 			name: "mixed sessions",
 			sessions: []domain.Session{
 				{
-					Start: domain.PlayerPIT{Overall: domain.GamemodeStatsPIT{Losses: 0, FinalDeaths: 0}},
-					End:   domain.PlayerPIT{Overall: domain.GamemodeStatsPIT{Losses: 0, FinalDeaths: 0}},
+					Start: domain.PlayerPIT{Overall: domain.GamemodeStatsPIT{Losses: 0, FinalDeaths: 0, Wins: 0}},
+					End:   domain.PlayerPIT{Overall: domain.GamemodeStatsPIT{Losses: 0, FinalDeaths: 0, Wins: 2}},
 				},
 				{
-					Start: domain.PlayerPIT{Overall: domain.GamemodeStatsPIT{Losses: 0, FinalDeaths: 0}},
-					End:   domain.PlayerPIT{Overall: domain.GamemodeStatsPIT{Losses: 1, FinalDeaths: 0}},
+					Start: domain.PlayerPIT{Overall: domain.GamemodeStatsPIT{Losses: 0, FinalDeaths: 0, Wins: 2}},
+					End:   domain.PlayerPIT{Overall: domain.GamemodeStatsPIT{Losses: 1, FinalDeaths: 0, Wins: 2}},
 				},
 				{
-					Start: domain.PlayerPIT{Overall: domain.GamemodeStatsPIT{Losses: 1, FinalDeaths: 0}},
-					End:   domain.PlayerPIT{Overall: domain.GamemodeStatsPIT{Losses: 1, FinalDeaths: 0}},
+					Start: domain.PlayerPIT{Overall: domain.GamemodeStatsPIT{Losses: 1, FinalDeaths: 0, Wins: 2}},
+					End:   domain.PlayerPIT{Overall: domain.GamemodeStatsPIT{Losses: 1, FinalDeaths: 0, Wins: 5}},
 				},
 				{
-					Start: domain.PlayerPIT{Overall: domain.GamemodeStatsPIT{Losses: 1, FinalDeaths: 0}},
-					End:   domain.PlayerPIT{Overall: domain.GamemodeStatsPIT{Losses: 1, FinalDeaths: 1}},
+					Start: domain.PlayerPIT{Overall: domain.GamemodeStatsPIT{Losses: 1, FinalDeaths: 0, Wins: 5}},
+					End:   domain.PlayerPIT{Overall: domain.GamemodeStatsPIT{Losses: 1, FinalDeaths: 1, Wins: 5}},
 				},
 			},
 			want: &flawlessSessionStats{
@@ -417,6 +417,306 @@ func TestComputeCoverage(t *testing.T) {
 				require.GreaterOrEqual(t, got.GamesPlayedPercentage, tt.wantCoverageMin)
 				require.LessOrEqual(t, got.GamesPlayedPercentage, tt.wantCoverageMax)
 				require.GreaterOrEqual(t, got.AdjustedTotalHours, tt.wantAdjustedHoursMin)
+			}
+		})
+	}
+}
+
+func TestComputeBestSessions(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name              string
+		sessions          []domain.Session
+		wantHighestFKDR   bool
+		wantMostKills     bool
+		wantMostFinals    bool
+		wantMostWins      bool
+		wantLongest       bool
+		wantWinsPerHour   bool
+		wantFinalsPerHour bool
+	}{
+		{
+			name:     "empty sessions",
+			sessions: []domain.Session{},
+		},
+		{
+			name: "single session",
+			sessions: []domain.Session{
+				{
+					Start: domain.PlayerPIT{
+						QueriedAt: time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC),
+						Overall:   domain.GamemodeStatsPIT{Kills: 0, FinalKills: 0, Wins: 0, FinalDeaths: 0},
+					},
+					End: domain.PlayerPIT{
+						QueriedAt: time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
+						Overall:   domain.GamemodeStatsPIT{Kills: 50, FinalKills: 20, Wins: 5, FinalDeaths: 2},
+					},
+				},
+			},
+			wantHighestFKDR:   true,
+			wantMostKills:     true,
+			wantMostFinals:    true,
+			wantMostWins:      true,
+			wantLongest:       true,
+			wantWinsPerHour:   true,
+			wantFinalsPerHour: true,
+		},
+		{
+			name: "multiple sessions with different bests",
+			sessions: []domain.Session{
+				{
+					Start: domain.PlayerPIT{
+						QueriedAt: time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC),
+						Overall:   domain.GamemodeStatsPIT{Kills: 0, FinalKills: 0, Wins: 0, FinalDeaths: 0},
+					},
+					End: domain.PlayerPIT{
+						QueriedAt: time.Date(2023, 1, 1, 11, 0, 0, 0, time.UTC),
+						Overall:   domain.GamemodeStatsPIT{Kills: 100, FinalKills: 10, Wins: 2, FinalDeaths: 1},
+					},
+				},
+				{
+					Start: domain.PlayerPIT{
+						QueriedAt: time.Date(2023, 1, 2, 10, 0, 0, 0, time.UTC),
+						Overall:   domain.GamemodeStatsPIT{Kills: 100, FinalKills: 10, Wins: 2, FinalDeaths: 1},
+					},
+					End: domain.PlayerPIT{
+						QueriedAt: time.Date(2023, 1, 2, 18, 0, 0, 0, time.UTC),
+						Overall:   domain.GamemodeStatsPIT{Kills: 150, FinalKills: 50, Wins: 20, FinalDeaths: 2},
+					},
+				},
+			},
+			wantHighestFKDR:   true,
+			wantMostKills:     true,
+			wantMostFinals:    true,
+			wantMostWins:      true,
+			wantLongest:       true,
+			wantWinsPerHour:   true,
+			wantFinalsPerHour: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := computeBestSessions(ctx, tt.sessions)
+			if len(tt.sessions) == 0 {
+				require.Nil(t, got)
+			} else {
+				require.NotNil(t, got)
+				if tt.wantHighestFKDR {
+					require.NotNil(t, got.HighestFKDR)
+				}
+				if tt.wantMostKills {
+					require.NotNil(t, got.MostKills)
+				}
+				if tt.wantMostFinals {
+					require.NotNil(t, got.MostFinalKills)
+				}
+				if tt.wantMostWins {
+					require.NotNil(t, got.MostWins)
+				}
+				if tt.wantLongest {
+					require.NotNil(t, got.LongestSession)
+				}
+				if tt.wantWinsPerHour {
+					require.NotNil(t, got.MostWinsPerHour)
+				}
+				if tt.wantFinalsPerHour {
+					require.NotNil(t, got.MostFinalsPerHour)
+				}
+			}
+		})
+	}
+}
+
+func TestComputeWinstreaks(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name        string
+		playerPITs  []domain.PlayerPIT
+		wantOverall bool
+	}{
+		{
+			name:       "empty PITs",
+			playerPITs: []domain.PlayerPIT{},
+		},
+		{
+			name: "winstreak then loss",
+			playerPITs: []domain.PlayerPIT{
+				{
+					QueriedAt: time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC),
+					Overall:   domain.GamemodeStatsPIT{Wins: 0, Losses: 0},
+				},
+				{
+					QueriedAt: time.Date(2023, 1, 1, 11, 0, 0, 0, time.UTC),
+					Overall:   domain.GamemodeStatsPIT{Wins: 5, Losses: 0},
+				},
+				{
+					QueriedAt: time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
+					Overall:   domain.GamemodeStatsPIT{Wins: 5, Losses: 1},
+				},
+			},
+			wantOverall: true,
+		},
+		{
+			name: "ongoing winstreak excluded",
+			playerPITs: []domain.PlayerPIT{
+				{
+					QueriedAt: time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC),
+					Overall:   domain.GamemodeStatsPIT{Wins: 0, Losses: 0},
+				},
+				{
+					QueriedAt: time.Date(2023, 1, 1, 11, 0, 0, 0, time.UTC),
+					Overall:   domain.GamemodeStatsPIT{Wins: 10, Losses: 0},
+				},
+			},
+			wantOverall: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := computeWinstreaks(ctx, tt.playerPITs)
+			if len(tt.playerPITs) == 0 {
+				require.Nil(t, got)
+			} else {
+				require.NotNil(t, got)
+				if tt.wantOverall {
+					require.NotNil(t, got.Overall)
+					require.Greater(t, got.Overall.Highest, 0)
+				} else {
+					if got.Overall != nil {
+						require.Equal(t, 0, got.Overall.Highest)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestComputeFinalKillStreaks(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name        string
+		playerPITs  []domain.PlayerPIT
+		wantOverall bool
+	}{
+		{
+			name:       "empty PITs",
+			playerPITs: []domain.PlayerPIT{},
+		},
+		{
+			name: "final kill streak then death",
+			playerPITs: []domain.PlayerPIT{
+				{
+					QueriedAt: time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC),
+					Overall:   domain.GamemodeStatsPIT{FinalKills: 0, FinalDeaths: 0},
+				},
+				{
+					QueriedAt: time.Date(2023, 1, 1, 11, 0, 0, 0, time.UTC),
+					Overall:   domain.GamemodeStatsPIT{FinalKills: 8, FinalDeaths: 0},
+				},
+				{
+					QueriedAt: time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
+					Overall:   domain.GamemodeStatsPIT{FinalKills: 8, FinalDeaths: 1},
+				},
+			},
+			wantOverall: true,
+		},
+		{
+			name: "ongoing streak excluded",
+			playerPITs: []domain.PlayerPIT{
+				{
+					QueriedAt: time.Date(2023, 1, 1, 10, 0, 0, 0, time.UTC),
+					Overall:   domain.GamemodeStatsPIT{FinalKills: 0, FinalDeaths: 0},
+				},
+				{
+					QueriedAt: time.Date(2023, 1, 1, 11, 0, 0, 0, time.UTC),
+					Overall:   domain.GamemodeStatsPIT{FinalKills: 15, FinalDeaths: 0},
+				},
+			},
+			wantOverall: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := computeFinalKillStreaks(ctx, tt.playerPITs)
+			if len(tt.playerPITs) == 0 {
+				require.Nil(t, got)
+			} else {
+				require.NotNil(t, got)
+				if tt.wantOverall {
+					require.NotNil(t, got.Overall)
+					require.Greater(t, got.Overall.Highest, 0)
+				} else {
+					if got.Overall != nil {
+						require.Equal(t, 0, got.Overall.Highest)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestComputeFavoritePlayIntervals(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name     string
+		sessions []domain.Session
+		wantLen  int
+	}{
+		{
+			name:     "empty sessions",
+			sessions: []domain.Session{},
+			wantLen:  0,
+		},
+		{
+			name: "single session",
+			sessions: []domain.Session{
+				{
+					Start: domain.PlayerPIT{QueriedAt: time.Date(2023, 1, 1, 14, 0, 0, 0, time.UTC)},
+					End:   domain.PlayerPIT{QueriedAt: time.Date(2023, 1, 1, 18, 0, 0, 0, time.UTC)},
+				},
+			},
+			wantLen: 1,
+		},
+		{
+			name: "multiple sessions with clear favorite",
+			sessions: []domain.Session{
+				{
+					Start: domain.PlayerPIT{QueriedAt: time.Date(2023, 1, 1, 14, 0, 0, 0, time.UTC)},
+					End:   domain.PlayerPIT{QueriedAt: time.Date(2023, 1, 1, 18, 0, 0, 0, time.UTC)},
+				},
+				{
+					Start: domain.PlayerPIT{QueriedAt: time.Date(2023, 1, 2, 14, 0, 0, 0, time.UTC)},
+					End:   domain.PlayerPIT{QueriedAt: time.Date(2023, 1, 2, 18, 0, 0, 0, time.UTC)},
+				},
+				{
+					Start: domain.PlayerPIT{QueriedAt: time.Date(2023, 1, 3, 9, 0, 0, 0, time.UTC)},
+					End:   domain.PlayerPIT{QueriedAt: time.Date(2023, 1, 3, 10, 0, 0, 0, time.UTC)},
+				},
+			},
+			wantLen: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := computeFavoritePlayIntervals(ctx, tt.sessions)
+			if tt.wantLen == 0 {
+				require.Nil(t, got)
+			} else {
+				require.NotNil(t, got)
+				require.GreaterOrEqual(t, len(got), 1)
+				require.LessOrEqual(t, len(got), 3)
+				// Check that intervals are sorted by percentage (descending)
+				for i := 1; i < len(got); i++ {
+					require.GreaterOrEqual(t, got[i-1].Percentage, got[i].Percentage)
+				}
 			}
 		})
 	}
