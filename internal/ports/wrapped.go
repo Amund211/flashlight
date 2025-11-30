@@ -382,8 +382,14 @@ func computeBestSessions(ctx context.Context, sessions []domain.Session) *bestSe
 		durationHours := duration.Hours()
 
 		// FKDR
-		if stats.FinalDeaths > 0 {
-			fkdr := float64(stats.FinalKills) / float64(stats.FinalDeaths)
+		if stats.FinalKills > 0 {
+			var fkdr float64
+			if stats.FinalDeaths > 0 {
+				fkdr = float64(stats.FinalKills) / float64(stats.FinalDeaths)
+			} else {
+				// If no final deaths, use final kills as FKDR
+				fkdr = float64(stats.FinalKills)
+			}
 			if bestFKDR == nil || fkdr > maxFKDR {
 				bestFKDR = session
 				maxFKDR = fkdr
