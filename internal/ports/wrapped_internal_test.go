@@ -663,9 +663,15 @@ func TestComputeWinstreaks(t *testing.T) {
 				domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 10, 0, 0, 0, time.UTC)).
 					WithOverallStats(domaintest.NewStatsBuilder().WithWins(0).WithLosses(0).Build()).Build(),
 				domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 11, 0, 0, 0, time.UTC)).
-					WithOverallStats(domaintest.NewStatsBuilder().WithWins(10).WithLosses(0).Build()).Build(),
+					WithOverallStats(domaintest.NewStatsBuilder().WithWins(6).WithLosses(0).Build()).Build(),
+				domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 12, 0, 0, 0, time.UTC)).
+					WithOverallStats(domaintest.NewStatsBuilder().WithWins(6).WithLosses(1).Build()).Build(),
+				domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.February, 1, 10, 0, 0, 0, time.UTC)).
+					WithOverallStats(domaintest.NewStatsBuilder().WithWins(6).WithLosses(0).Build()).Build(),
+				domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.February, 1, 11, 0, 0, 0, time.UTC)).
+					WithOverallStats(domaintest.NewStatsBuilder().WithWins(100).WithLosses(0).Build()).Build(),
 			},
-			wantOverallHigh: 0,
+			wantOverallHigh: 6,
 		},
 		{
 			name: "concurrent wins and losses - extra wins don't count",
@@ -686,19 +692,15 @@ func TestComputeWinstreaks(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := computeWinstreaks(ctx, tt.playerPITs)
+
 			if len(tt.playerPITs) == 0 {
 				require.Nil(t, got)
-			} else {
-				require.NotNil(t, got)
-				if tt.wantOverallHigh > 0 {
-					require.NotNil(t, got.Overall)
-					require.Equal(t, tt.wantOverallHigh, got.Overall.Highest)
-				} else {
-					if got.Overall != nil {
-						require.Equal(t, 0, got.Overall.Highest)
-					}
-				}
+				return
 			}
+			require.NotNil(t, got)
+			require.NotNil(t, got.Overall)
+
+			require.Equal(t, tt.wantOverallHigh, got.Overall.Highest)
 		})
 	}
 }
@@ -736,9 +738,15 @@ func TestComputeFinalKillStreaks(t *testing.T) {
 				domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 10, 0, 0, 0, time.UTC)).
 					WithOverallStats(domaintest.NewStatsBuilder().WithFinalKills(0).WithFinalDeaths(0).Build()).Build(),
 				domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 11, 0, 0, 0, time.UTC)).
-					WithOverallStats(domaintest.NewStatsBuilder().WithFinalKills(15).WithFinalDeaths(0).Build()).Build(),
+					WithOverallStats(domaintest.NewStatsBuilder().WithFinalKills(9).WithFinalDeaths(0).Build()).Build(),
+				domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 12, 0, 0, 0, time.UTC)).
+					WithOverallStats(domaintest.NewStatsBuilder().WithFinalKills(9).WithFinalDeaths(1).Build()).Build(),
+				domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.February, 1, 10, 0, 0, 0, time.UTC)).
+					WithOverallStats(domaintest.NewStatsBuilder().WithFinalKills(9).WithFinalDeaths(0).Build()).Build(),
+				domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.February, 1, 11, 0, 0, 0, time.UTC)).
+					WithOverallStats(domaintest.NewStatsBuilder().WithFinalKills(100).WithFinalDeaths(0).Build()).Build(),
 			},
-			wantOverallHigh: 0,
+			wantOverallHigh: 9,
 		},
 		{
 			name: "concurrent final kills and deaths - extra kills don't count",
@@ -759,19 +767,15 @@ func TestComputeFinalKillStreaks(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := computeFinalKillStreaks(ctx, tt.playerPITs)
+
 			if len(tt.playerPITs) == 0 {
 				require.Nil(t, got)
-			} else {
-				require.NotNil(t, got)
-				if tt.wantOverallHigh > 0 {
-					require.NotNil(t, got.Overall)
-					require.Equal(t, tt.wantOverallHigh, got.Overall.Highest)
-				} else {
-					if got.Overall != nil {
-						require.Equal(t, 0, got.Overall.Highest)
-					}
-				}
+				return
 			}
+			require.NotNil(t, got)
+			require.NotNil(t, got.Overall)
+
+			require.Equal(t, tt.wantOverallHigh, got.Overall.Highest)
 		})
 	}
 }

@@ -594,8 +594,8 @@ func computeWinstreaks(ctx context.Context, playerPITs []domain.PlayerPIT) *wins
 
 	// Helper to compute winstreak for a gamemode
 	computeGamemodeWinstreak := func(getStats func(*domain.PlayerPIT) domain.GamemodeStatsPIT) *gamemodeWinstreak {
-		var maxStreak int
-		var maxStreakTime time.Time
+		var maxEndedStreak int
+		var maxStreakEndedAt time.Time
 		currentStreak := 0
 		prevWins := 0
 		prevLosses := 0
@@ -612,33 +612,27 @@ func computeWinstreaks(ctx context.Context, playerPITs []domain.PlayerPIT) *wins
 
 			if lossesGained > 0 {
 				// Streak broken
+
+				// Don't count ongoing streaks
+				if currentStreak > maxEndedStreak {
+					maxEndedStreak = currentStreak
+					maxStreakEndedAt = pit.QueriedAt
+				}
+
 				currentStreak = 0
 			} else if winsGained > 0 {
 				// Streak continues/starts
 				currentStreak += winsGained
-				if currentStreak > maxStreak {
-					maxStreak = currentStreak
-					maxStreakTime = pit.QueriedAt
-				}
 			}
 
 			prevWins = wins
 			prevLosses = losses
 		}
 
-		// Don't count ongoing streaks
-		if currentStreak == maxStreak {
-			maxStreak = 0
-			maxStreakTime = time.Time{}
+		return &gamemodeWinstreak{
+			Highest: maxEndedStreak,
+			When:    maxStreakEndedAt,
 		}
-
-		if maxStreak > 0 {
-			return &gamemodeWinstreak{
-				Highest: maxStreak,
-				When:    maxStreakTime,
-			}
-		}
-		return nil
 	}
 
 	result.Overall = computeGamemodeWinstreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Overall })
@@ -660,8 +654,8 @@ func computeFinalKillStreaks(ctx context.Context, playerPITs []domain.PlayerPIT)
 
 	// Helper to compute final kill streak for a gamemode
 	computeGamemodeFKStreak := func(getStats func(*domain.PlayerPIT) domain.GamemodeStatsPIT) *gamemodeFinalKillStreak {
-		var maxStreak int
-		var maxStreakTime time.Time
+		var maxEndedStreak int
+		var maxStreakEndedAt time.Time
 		currentStreak := 0
 		prevFKills := 0
 		prevFDeaths := 0
@@ -678,33 +672,27 @@ func computeFinalKillStreaks(ctx context.Context, playerPITs []domain.PlayerPIT)
 
 			if fdeathsGained > 0 {
 				// Streak broken
+
+				// Don't count ongoing streaks
+				if currentStreak > maxEndedStreak {
+					maxEndedStreak = currentStreak
+					maxStreakEndedAt = pit.QueriedAt
+				}
+
 				currentStreak = 0
 			} else if fkillsGained > 0 {
 				// Streak continues/starts
 				currentStreak += fkillsGained
-				if currentStreak > maxStreak {
-					maxStreak = currentStreak
-					maxStreakTime = pit.QueriedAt
-				}
 			}
 
 			prevFKills = fkills
 			prevFDeaths = fdeaths
 		}
 
-		// Don't count ongoing streaks
-		if currentStreak == maxStreak {
-			maxStreak = 0
-			maxStreakTime = time.Time{}
+		return &gamemodeFinalKillStreak{
+			Highest: maxEndedStreak,
+			When:    maxStreakEndedAt,
 		}
-
-		if maxStreak > 0 {
-			return &gamemodeFinalKillStreak{
-				Highest: maxStreak,
-				When:    maxStreakTime,
-			}
-		}
-		return nil
 	}
 
 	result.Overall = computeGamemodeFKStreak(func(p *domain.PlayerPIT) domain.GamemodeStatsPIT { return p.Overall })
