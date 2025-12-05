@@ -6,8 +6,8 @@ on:
     branches:
       - main
   schedule:
-    # Run once a week on Sundays at 00:00 UTC
-    - cron: '0 0 * * 0'
+    # Run every day at 4:40 UTC
+    - cron: '40 4 * * *'
 
 permissions:
   contents: read
