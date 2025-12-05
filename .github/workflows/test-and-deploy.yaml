@@ -80,18 +80,6 @@ jobs:
         run: |
           ./cmd/test-ip-rate-limit.sh
 
-  check-vulnerabilities:
-    name: Check for vulnerable dependencies
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: 'go.mod'
-
-      - name: Check for vulnerable dependencies
-        run: go tool govulncheck ./...
-
   push-otel-collector-test:
     name: Build and push OTel Collector for test instance
     runs-on: ubuntu-latest

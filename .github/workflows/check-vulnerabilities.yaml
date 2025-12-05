@@ -1,0 +1,26 @@
+name: Check for vulnerable dependencies
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    # Run once a week on Sundays at 00:00 UTC
+    - cron: '0 0 * * 0'
+
+permissions:
+  contents: read
+
+jobs:
+  check-vulnerabilities:
+    name: Check for vulnerable dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Check for vulnerable dependencies
+        run: go tool govulncheck ./...
