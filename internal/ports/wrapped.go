@@ -19,14 +19,14 @@ import (
 )
 
 type wrappedResponse struct {
-	Success                bool                `json:"success"`
-	UUID                   string              `json:"uuid,omitempty"`
-	Year                   int                 `json:"year,omitempty"`
-	TotalSessions          int                 `json:"totalSessions"`
-	NonConsecutiveSessions int                 `json:"nonConsecutiveSessions"`
-	YearStats              *yearBoundaryStats  `json:"yearStats,omitempty"`
-	SessionStats           *sessionStats       `json:"sessionStats,omitempty"`
-	Cause                  string              `json:"cause,omitempty"`
+	Success                bool               `json:"success"`
+	UUID                   string             `json:"uuid,omitempty"`
+	Year                   int                `json:"year,omitempty"`
+	TotalSessions          int                `json:"totalSessions"`
+	NonConsecutiveSessions int                `json:"nonConsecutiveSessions"`
+	YearStats              *yearBoundaryStats `json:"yearStats,omitempty"`
+	SessionStats           *sessionStats      `json:"sessionStats,omitempty"`
+	Cause                  string             `json:"cause,omitempty"`
 }
 
 // sessionStats contains statistics computed from consecutive sessions
