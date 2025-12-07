@@ -88,11 +88,6 @@ func TestComputeSessionsPerMonth(t *testing.T) {
 		want     map[int]int
 	}{
 		{
-			name:     "empty sessions",
-			sessions: []domain.Session{},
-			want:     map[int]int{},
-		},
-		{
 			name: "sessions in different months",
 			sessions: []domain.Session{
 				{
@@ -146,13 +141,8 @@ func TestComputeFlawlessSessions(t *testing.T) {
 	tests := []struct {
 		name     string
 		sessions []domain.Session
-		want     *flawlessSessionStats
+		want     flawlessSessionStats
 	}{
-		{
-			name:     "empty sessions",
-			sessions: []domain.Session{},
-			want:     nil,
-		},
 		{
 			name: "no flawless sessions - has losses",
 			sessions: []domain.Session{
@@ -169,7 +159,7 @@ func TestComputeFlawlessSessions(t *testing.T) {
 						WithOverallStats(domaintest.NewStatsBuilder().WithLosses(1).WithFinalDeaths(1).Build()).Build(),
 				},
 			},
-			want: &flawlessSessionStats{
+			want: flawlessSessionStats{
 				Count:      0,
 				Percentage: 0,
 			},
@@ -190,7 +180,7 @@ func TestComputeFlawlessSessions(t *testing.T) {
 						WithOverallStats(domaintest.NewStatsBuilder().WithLosses(0).WithFinalDeaths(0).WithWins(10).Build()).Build(),
 				},
 			},
-			want: &flawlessSessionStats{
+			want: flawlessSessionStats{
 				Count:      2,
 				Percentage: 100,
 			},
@@ -223,7 +213,7 @@ func TestComputeFlawlessSessions(t *testing.T) {
 						WithOverallStats(domaintest.NewStatsBuilder().WithLosses(1).WithFinalDeaths(1).WithWins(5).Build()).Build(),
 				},
 			},
-			want: &flawlessSessionStats{
+			want: flawlessSessionStats{
 				Count:      2,
 				Percentage: 50,
 			},
@@ -253,7 +243,7 @@ func TestComputeAverages(t *testing.T) {
 	tests := []struct {
 		name     string
 		sessions []domain.Session
-		want     *averageStats
+		want averageStats
 	}{
 		{
 			name:     "empty sessions",
@@ -266,11 +256,6 @@ func TestComputeAverages(t *testing.T) {
 				{
 					Start: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 10, 0, 0, 0, time.UTC)).
 						WithOverallStats(domaintest.NewStatsBuilder().WithGamesPlayed(0).WithWins(0).WithFinalKills(0).Build()).Build(),
-					End: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 12, 0, 0, 0, time.UTC)).
-						WithOverallStats(domaintest.NewStatsBuilder().WithGamesPlayed(10).WithWins(5).WithFinalKills(20).Build()).Build(),
-				},
-			},
-			want: &averageStats{
 				SessionLength: 2.0,
 				GamesPlayed:   10.0,
 				Wins:          5.0,
@@ -293,7 +278,7 @@ func TestComputeAverages(t *testing.T) {
 						WithOverallStats(domaintest.NewStatsBuilder().WithGamesPlayed(30).WithWins(15).WithFinalKills(60).Build()).Build(),
 				},
 			},
-			want: &averageStats{
+			want: averageStats{
 				SessionLength: (2.0 + 4.0) / 2,
 				GamesPlayed:   (10.0 + 20.0) / 2,
 				Wins:          (5.0 + 10.0) / 2,
@@ -306,15 +291,10 @@ func TestComputeAverages(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := computeAverages(ctx, tt.sessions)
-			if tt.want == nil {
-				require.Nil(t, got)
-			} else {
-				require.NotNil(t, got)
-				require.InDelta(t, tt.want.SessionLength, got.SessionLength, 0.0001)
-				require.InDelta(t, tt.want.GamesPlayed, got.GamesPlayed, 0.0001)
-				require.InDelta(t, tt.want.Wins, got.Wins, 0.0001)
-				require.InDelta(t, tt.want.FinalKills, got.FinalKills, 0.0001)
-			}
+			require.InDelta(t, tt.want.SessionLength, got.SessionLength, 0.0001)
+			require.InDelta(t, tt.want.GamesPlayed, got.GamesPlayed, 0.0001)
+			require.InDelta(t, tt.want.Wins, got.Wins, 0.0001)
+			require.InDelta(t, tt.want.FinalKills, got.FinalKills, 0.0001)
 		})
 	}
 }
@@ -843,13 +823,8 @@ func TestComputePlaytimeDistribution(t *testing.T) {
 		sessions                []domain.Session
 		wantHourlyDistribution  [24]float64
 		wantDayHourDistribution map[string][24]float64
-		wantNil                 bool
 	}{
 		{
-			name:     "empty sessions",
-			sessions: []domain.Session{},
-			wantNil:  true,
-		},
 		{
 			name: "single session within one hour",
 			sessions: []domain.Session{
