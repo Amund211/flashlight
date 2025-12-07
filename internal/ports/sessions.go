@@ -80,10 +80,11 @@ func MakeGetSessionsHandler(
 			return
 		}
 		request := struct {
-			UUID string    `json:"uuid"`
-			Start time.Time `json:"start"`
-			End   time.Time `json:"end"`
-			Year  *int      `json:"year,omitempty"`
+			UUID     string    `json:"uuid"`
+			Start    time.Time `json:"start"`
+			End      time.Time `json:"end"`
+			Year     *int      `json:"year,omitempty"`
+			Timezone string    `json:"timezone,omitempty"`
 		}{}
 		err = json.Unmarshal(body, &request)
 		if err != nil {
@@ -146,9 +147,22 @@ func MakeGetSessionsHandler(
 		
 		// If year is provided and we have sessions, compute additional stats
 		if request.Year != nil && len(sessions) > 0 {
+			// Default timezone to UTC if not provided
+			timezone := request.Timezone
+			if timezone == "" {
+				timezone = "UTC"
+			}
+			
 			totalSessions := app.ComputeTotalSessions(sessions)
 			totalConsecutiveSessions := app.ComputeTotalConsecutiveSessions(sessions)
-			utcTimeHistogram := app.ComputeUTCTimeHistogram(sessions)
+			timeHistogram, err := app.ComputeTimeHistogram(sessions, timezone)
+			if err != nil {
+				reporting.Report(ctx, fmt.Errorf("invalid timezone: %w", err), map[string]string{
+					"timezone": timezone,
+				})
+				http.Error(w, "Invalid timezone", http.StatusBadRequest)
+				return
+			}
 			
 			marshalled, err = SessionsToRainbowSessionsDataWithStats(
 				sessions,
@@ -156,7 +170,7 @@ func MakeGetSessionsHandler(
 				*request.Year,
 				totalSessions,
 				totalConsecutiveSessions,
-				utcTimeHistogram,
+				timeHistogram,
 			)
 		} else {
 			marshalled, err = SessionsToRainbowSessionsData(sessions)

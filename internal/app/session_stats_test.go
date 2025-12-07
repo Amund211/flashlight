@@ -155,3 +155,80 @@ func TestComputeUTCTimeHistogram(t *testing.T) {
 	}
 	require.Equal(t, len(sessions), total)
 }
+
+func TestComputeTimeHistogram(t *testing.T) {
+	t.Parallel()
+
+	uuid := domaintest.NewUUID(t)
+
+	t.Run("UTC timezone", func(t *testing.T) {
+		t.Parallel()
+
+		// Create sessions at different hours in UTC
+		sessions := []domain.Session{
+			{
+				Start: domaintest.NewPlayerBuilder(uuid, time.Date(2024, 1, 1, 0, 30, 0, 0, time.UTC)).FromDB().Build(),
+			},
+			{
+				Start: domaintest.NewPlayerBuilder(uuid, time.Date(2024, 1, 1, 14, 15, 0, 0, time.UTC)).FromDB().Build(),
+			},
+		}
+
+		result, err := app.ComputeTimeHistogram(sessions, "UTC")
+		require.NoError(t, err)
+		require.Equal(t, 1, result[0])
+		require.Equal(t, 1, result[14])
+	})
+
+	t.Run("Europe/Oslo timezone", func(t *testing.T) {
+		t.Parallel()
+
+		// Create a session at midnight UTC (which is 1am or 2am in Oslo depending on DST)
+		sessions := []domain.Session{
+			{
+				// Jan 1, midnight UTC = 1am CET (Oslo winter time)
+				Start: domaintest.NewPlayerBuilder(uuid, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)).FromDB().Build(),
+			},
+			{
+				// July 1, midnight UTC = 2am CEST (Oslo summer time)
+				Start: domaintest.NewPlayerBuilder(uuid, time.Date(2024, 7, 1, 0, 0, 0, 0, time.UTC)).FromDB().Build(),
+			},
+		}
+
+		result, err := app.ComputeTimeHistogram(sessions, "Europe/Oslo")
+		require.NoError(t, err)
+		// Winter: UTC+1, so midnight UTC = 1am Oslo
+		require.Equal(t, 1, result[1])
+		// Summer: UTC+2, so midnight UTC = 2am Oslo
+		require.Equal(t, 1, result[2])
+	})
+
+	t.Run("America/New_York timezone", func(t *testing.T) {
+		t.Parallel()
+
+		sessions := []domain.Session{
+			{
+				// Jan 1, 5am UTC = midnight EST (New York winter time, UTC-5)
+				Start: domaintest.NewPlayerBuilder(uuid, time.Date(2024, 1, 1, 5, 0, 0, 0, time.UTC)).FromDB().Build(),
+			},
+		}
+
+		result, err := app.ComputeTimeHistogram(sessions, "America/New_York")
+		require.NoError(t, err)
+		require.Equal(t, 1, result[0]) // midnight in New York
+	})
+
+	t.Run("invalid timezone", func(t *testing.T) {
+		t.Parallel()
+
+		sessions := []domain.Session{
+			{
+				Start: domaintest.NewPlayerBuilder(uuid, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)).FromDB().Build(),
+			},
+		}
+
+		_, err := app.ComputeTimeHistogram(sessions, "Invalid/Timezone")
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "invalid timezone")
+	})
+}

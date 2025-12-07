@@ -273,7 +273,7 @@ func TestMakeGetSessionsHandler(t *testing.T) {
 			ComputedStats *struct {
 				TotalSessions            int     `json:"totalSessions"`
 				TotalConsecutiveSessions int     `json:"totalConsecutiveSessions"`
-				UTCTimeHistogram         [24]int `json:"utcTimeHistogram"`
+				TimeHistogram            [24]int `json:"timeHistogram"`
 			} `json:"computedStats"`
 		}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
@@ -281,5 +281,83 @@ func TestMakeGetSessionsHandler(t *testing.T) {
 		require.NotNil(t, response.ComputedStats)
 		require.Equal(t, 1, response.ComputedStats.TotalSessions)
 		require.Equal(t, 1, response.ComputedStats.TotalConsecutiveSessions)
+	})
+
+	t.Run("with timezone parameter uses custom timezone", func(t *testing.T) {
+		t.Parallel()
+
+		year := 2023
+		timezone := "Europe/Oslo"
+		
+		getPlayerPITs, called := makeGetPlayerPITs(t, uuid, start, end, stats, nil)
+		handler := makeGetSessionsHandler(getPlayerPITs)
+
+		body := io.NopCloser(
+			strings.NewReader(
+				fmt.Sprintf(
+					`{"uuid":"%s","start":"%s","end":"%s","year":%d,"timezone":"%s"}`,
+					uuid,
+					startStr,
+					endStr,
+					year,
+					timezone,
+				),
+			),
+		)
+		req := httptest.NewRequest("GET", "/sessions", body)
+		w := httptest.NewRecorder()
+
+		handler.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		require.True(t, *called)
+		
+		// Verify response structure
+		var response struct {
+			Sessions      []interface{} `json:"sessions"`
+			ComputedStats *struct {
+				TimeHistogram [24]int `json:"timeHistogram"`
+			} `json:"computedStats"`
+		}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+		require.NotNil(t, response.ComputedStats)
+		// Just verify we got a histogram back (specific hour validation is in app layer tests)
+		total := 0
+		for _, count := range response.ComputedStats.TimeHistogram {
+			total += count
+		}
+		require.Greater(t, total, 0)
+	})
+
+	t.Run("invalid timezone returns error", func(t *testing.T) {
+		t.Parallel()
+
+		year := 2023
+		timezone := "Invalid/Timezone"
+		
+		getPlayerPITs, called := makeGetPlayerPITs(t, uuid, start, end, stats, nil)
+		handler := makeGetSessionsHandler(getPlayerPITs)
+
+		body := io.NopCloser(
+			strings.NewReader(
+				fmt.Sprintf(
+					`{"uuid":"%s","start":"%s","end":"%s","year":%d,"timezone":"%s"}`,
+					uuid,
+					startStr,
+					endStr,
+					year,
+					timezone,
+				),
+			),
+		)
+		req := httptest.NewRequest("GET", "/sessions", body)
+		w := httptest.NewRecorder()
+
+		handler.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusBadRequest, w.Code)
+		require.Contains(t, w.Body.String(), "Invalid timezone")
+		require.True(t, *called)
 	})
 }

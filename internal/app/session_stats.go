@@ -1,6 +1,9 @@
 package app
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/Amund211/flashlight/internal/domain"
 )
 
@@ -62,11 +65,30 @@ func ComputeStatsAtYearEnd(stats []domain.PlayerPIT, year int) *domain.PlayerPIT
 // Returns an array of 24 integers, where index 0 is midnight-1am, index 1 is 1am-2am, etc.
 // Each value is the count of sessions that started in that hour.
 // Assumes sessions is not empty
+// Deprecated: Use ComputeTimeHistogram with a timezone instead
 func ComputeUTCTimeHistogram(sessions []domain.Session) [24]int {
+	loc := time.UTC
+	return computeTimeHistogramInLocation(sessions, loc)
+}
+
+// ComputeTimeHistogram computes a histogram of sessions by hour of day in the given timezone.
+// Returns an array of 24 integers, where index 0 is midnight-1am, index 1 is 1am-2am, etc.
+// Each value is the count of sessions that started in that hour in the specified timezone.
+// Assumes sessions is not empty
+func ComputeTimeHistogram(sessions []domain.Session, timezone string) ([24]int, error) {
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		return [24]int{}, fmt.Errorf("invalid timezone: %w", err)
+	}
+	
+	return computeTimeHistogramInLocation(sessions, loc), nil
+}
+
+func computeTimeHistogramInLocation(sessions []domain.Session, loc *time.Location) [24]int {
 	var histogram [24]int
 	
 	for _, session := range sessions {
-		hour := session.Start.QueriedAt.UTC().Hour()
+		hour := session.Start.QueriedAt.In(loc).Hour()
 		histogram[hour]++
 	}
 	

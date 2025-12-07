@@ -116,7 +116,7 @@ func sessionsToRainbowSessions(sessions []domain.Session) []rainbowSession {
 type rainbowSessionComputedStats struct {
 	TotalSessions            int                   `json:"totalSessions"`
 	TotalConsecutiveSessions int                   `json:"totalConsecutiveSessions"`
-	UTCTimeHistogram         [24]int               `json:"utcTimeHistogram"`
+	TimeHistogram            [24]int               `json:"timeHistogram"`
 	StatsAtYearStart         *rainbowPlayerDataPIT `json:"statsAtYearStart"`
 	StatsAtYearEnd           *rainbowPlayerDataPIT `json:"statsAtYearEnd"`
 }
@@ -140,7 +140,7 @@ func SessionsToRainbowSessionsDataWithStats(
 	year int,
 	totalSessions int,
 	totalConsecutiveSessions int,
-	utcTimeHistogram [24]int,
+	timeHistogram [24]int,
 ) ([]byte, error) {
 	response := rainbowSessionsResponse{
 		Sessions: sessionsToRainbowSessions(sessions),
@@ -166,7 +166,7 @@ func SessionsToRainbowSessionsDataWithStats(
 		response.ComputedStats = &rainbowSessionComputedStats{
 			TotalSessions:            totalSessions,
 			TotalConsecutiveSessions: totalConsecutiveSessions,
-			UTCTimeHistogram:         utcTimeHistogram,
+			TimeHistogram:            timeHistogram,
 			StatsAtYearStart:         rainbowStatsStart,
 			StatsAtYearEnd:           rainbowStatsEnd,
 		}
