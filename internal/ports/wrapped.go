@@ -236,7 +236,7 @@ func MakeGetWrappedHandler(
 		}
 		location, err := time.LoadLocation(timezoneStr)
 		if err != nil {
-			logging.FromContext(ctx).Warning("Invalid timezone", "tzstring", timezoneStr, "err", err)
+			logging.FromContext(ctx).WarnContext(ctx, "Invalid timezone", "tzstring", timezoneStr, "err", err)
 			statusCode := http.StatusBadRequest
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(statusCode)
