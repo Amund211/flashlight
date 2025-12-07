@@ -80,9 +80,10 @@ func MakeGetSessionsHandler(
 			return
 		}
 		request := struct {
-			UUID  string    `json:"uuid"`
+			UUID string    `json:"uuid"`
 			Start time.Time `json:"start"`
 			End   time.Time `json:"end"`
+			Year  *int      `json:"year,omitempty"`
 		}{}
 		err = json.Unmarshal(body, &request)
 		if err != nil {
@@ -141,7 +142,26 @@ func MakeGetSessionsHandler(
 
 		sessions := app.ComputeSessions(ctx, stats, request.Start, request.End)
 
-		marshalled, err := SessionsToRainbowSessionsData(sessions)
+		var marshalled []byte
+		
+		// If year is provided and we have sessions, compute additional stats
+		if request.Year != nil && len(sessions) > 0 {
+			totalSessions := app.ComputeTotalSessions(sessions)
+			totalConsecutiveSessions := app.ComputeTotalConsecutiveSessions(sessions)
+			utcTimeHistogram := app.ComputeUTCTimeHistogram(sessions)
+			
+			marshalled, err = SessionsToRainbowSessionsDataWithStats(
+				sessions,
+				stats,
+				*request.Year,
+				totalSessions,
+				totalConsecutiveSessions,
+				utcTimeHistogram,
+			)
+		} else {
+			marshalled, err = SessionsToRainbowSessionsData(sessions)
+		}
+		
 		if err != nil {
 			reporting.Report(ctx, fmt.Errorf("failed to convert sessions to response: %w", err), map[string]string{
 				"length": strconv.Itoa(len(sessions)),

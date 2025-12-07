@@ -2,6 +2,7 @@ package ports_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -237,5 +238,48 @@ func TestMakeGetSessionsHandler(t *testing.T) {
 
 		require.Equal(t, http.StatusOK, w.Code)
 		require.True(t, *called)
+	})
+
+	t.Run("with year parameter computes stats", func(t *testing.T) {
+		t.Parallel()
+
+		year := 2023
+		
+		getPlayerPITs, called := makeGetPlayerPITs(t, uuid, start, end, stats, nil)
+		handler := makeGetSessionsHandler(getPlayerPITs)
+
+		body := io.NopCloser(
+			strings.NewReader(
+				fmt.Sprintf(
+					`{"uuid":"%s","start":"%s","end":"%s","year":%d}`,
+					uuid,
+					startStr,
+					endStr,
+					year,
+				),
+			),
+		)
+		req := httptest.NewRequest("GET", "/sessions", body)
+		w := httptest.NewRecorder()
+
+		handler.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		require.True(t, *called)
+		
+		// Verify response structure
+		var response struct {
+			Sessions      []interface{} `json:"sessions"`
+			ComputedStats *struct {
+				TotalSessions            int     `json:"totalSessions"`
+				TotalConsecutiveSessions int     `json:"totalConsecutiveSessions"`
+				UTCTimeHistogram         [24]int `json:"utcTimeHistogram"`
+			} `json:"computedStats"`
+		}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		require.NoError(t, err)
+		require.NotNil(t, response.ComputedStats)
+		require.Equal(t, 1, response.ComputedStats.TotalSessions)
+		require.Equal(t, 1, response.ComputedStats.TotalConsecutiveSessions)
 	})
 }

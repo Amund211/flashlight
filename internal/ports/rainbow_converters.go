@@ -113,10 +113,98 @@ func sessionsToRainbowSessions(sessions []domain.Session) []rainbowSession {
 	return rainbowSessions
 }
 
+type rainbowSessionComputedStats struct {
+	TotalSessions            int                   `json:"totalSessions"`
+	TotalConsecutiveSessions int                   `json:"totalConsecutiveSessions"`
+	UTCTimeHistogram         [24]int               `json:"utcTimeHistogram"`
+	StatsAtYearStart         *rainbowPlayerDataPIT `json:"statsAtYearStart"`
+	StatsAtYearEnd           *rainbowPlayerDataPIT `json:"statsAtYearEnd"`
+}
+
+type rainbowSessionsResponse struct {
+	Sessions      []rainbowSession              `json:"sessions"`
+	ComputedStats *rainbowSessionComputedStats `json:"computedStats,omitempty"`
+}
+
 func SessionsToRainbowSessionsData(sessions []domain.Session) ([]byte, error) {
 	sessionsDataJSON, err := json.Marshal(sessionsToRainbowSessions(sessions))
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal sessions data: %w", err)
 	}
 	return sessionsDataJSON, nil
+}
+
+func SessionsToRainbowSessionsDataWithStats(
+	sessions []domain.Session,
+	stats []domain.PlayerPIT,
+	year int,
+	totalSessions int,
+	totalConsecutiveSessions int,
+	utcTimeHistogram [24]int,
+) ([]byte, error) {
+	response := rainbowSessionsResponse{
+		Sessions: sessionsToRainbowSessions(sessions),
+	}
+
+	// Only add computed stats if we have sessions
+	if len(sessions) > 0 {
+		statsAtYearStart := computeStatsAtYearStart(stats, year)
+		statsAtYearEnd := computeStatsAtYearEnd(stats, year)
+
+		var rainbowStatsStart *rainbowPlayerDataPIT
+		if statsAtYearStart != nil {
+			rainbowStats := playerToRainbowPlayerDataPIT(statsAtYearStart)
+			rainbowStatsStart = &rainbowStats
+		}
+
+		var rainbowStatsEnd *rainbowPlayerDataPIT
+		if statsAtYearEnd != nil {
+			rainbowStats := playerToRainbowPlayerDataPIT(statsAtYearEnd)
+			rainbowStatsEnd = &rainbowStats
+		}
+
+		response.ComputedStats = &rainbowSessionComputedStats{
+			TotalSessions:            totalSessions,
+			TotalConsecutiveSessions: totalConsecutiveSessions,
+			UTCTimeHistogram:         utcTimeHistogram,
+			StatsAtYearStart:         rainbowStatsStart,
+			StatsAtYearEnd:           rainbowStatsEnd,
+		}
+	}
+
+	responseJSON, err := json.Marshal(response)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal sessions response: %w", err)
+	}
+	return responseJSON, nil
+}
+
+func computeStatsAtYearStart(stats []domain.PlayerPIT, year int) *domain.PlayerPIT {
+	var earliest *domain.PlayerPIT
+
+	for i := range stats {
+		stat := &stats[i]
+		if stat.QueriedAt.Year() == year {
+			if earliest == nil || stat.QueriedAt.Before(earliest.QueriedAt) {
+				earliest = stat
+			}
+		}
+	}
+
+	return earliest
+}
+
+func computeStatsAtYearEnd(stats []domain.PlayerPIT, year int) *domain.PlayerPIT {
+	var latest *domain.PlayerPIT
+
+	for i := range stats {
+		stat := &stats[i]
+		if stat.QueriedAt.Year() == year {
+			if latest == nil || stat.QueriedAt.After(latest.QueriedAt) {
+				latest = stat
+			}
+		}
+	}
+
+	return latest
 }
