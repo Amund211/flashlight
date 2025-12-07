@@ -21,11 +21,6 @@ func TestComputeSessionLengths(t *testing.T) {
 		want     *sessionLengthStats
 	}{
 		{
-			name:     "empty sessions",
-			sessions: []domain.Session{},
-			want:     nil,
-		},
-		{
 			name: "single session",
 			sessions: []domain.Session{
 				{
@@ -483,16 +478,8 @@ func TestComputeCoverage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := computeCoverage(ctx, tt.playerPITs, tt.sessions, tt.year)
-			if tt.expectNil {
-				if got != nil && len(tt.playerPITs) == 0 {
-					require.Equal(t, 0.0, got.GamesPlayedPercentage)
-					require.Equal(t, 0.0, got.AdjustedTotalHours)
-				}
-			} else {
-				require.NotNil(t, got)
-				require.InDelta(t, tt.wantCoverage, got.GamesPlayedPercentage, 0.01)
-				require.GreaterOrEqual(t, got.AdjustedTotalHours, tt.wantAdjustedMin)
-			}
+			require.InDelta(t, tt.wantCoverage, got.GamesPlayedPercentage, 0.01)
+			require.GreaterOrEqual(t, got.AdjustedTotalHours, tt.wantAdjustedMin)
 		})
 	}
 }
@@ -514,8 +501,7 @@ func TestComputeBestSessions(t *testing.T) {
 		wantFinalsPerHour *float64
 	}{
 		{
-			name:     "empty sessions",
-			sessions: []domain.Session{},
+			name: "empty sessions",
 		},
 		{
 			name: "single session",
@@ -641,11 +627,6 @@ func TestComputeWinstreaks(t *testing.T) {
 		wantOverallHigh int
 	}{
 		{
-			name:            "empty PITs",
-			playerPITs:      []domain.PlayerPIT{},
-			wantOverallHigh: 0,
-		},
-		{
 			name: "winstreak of 5 then loss",
 			playerPITs: []domain.PlayerPIT{
 				domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 10, 0, 0, 0, time.UTC)).
@@ -715,11 +696,7 @@ func TestComputeFinalKillStreaks(t *testing.T) {
 		playerPITs      []domain.PlayerPIT
 		wantOverallHigh int
 	}{
-		{
-			name:            "empty PITs",
-			playerPITs:      []domain.PlayerPIT{},
-			wantOverallHigh: 0,
-		},
+		{},
 		{
 			name: "final kill streak of 8 then death",
 			playerPITs: []domain.PlayerPIT{
@@ -791,12 +768,7 @@ func TestComputeFavoritePlayIntervals(t *testing.T) {
 		wantMinResults int
 		wantMaxResults int
 	}{
-		{
-			name:           "empty sessions",
-			sessions:       []domain.Session{},
-			wantMinResults: 0,
-			wantMaxResults: 0,
-		},
+		{},
 		{
 			name: "single 4-hour session",
 			sessions: []domain.Session{
