@@ -65,7 +65,16 @@ func ComputeStatsAtYearEnd(stats []domain.PlayerPIT, year int) *domain.PlayerPIT
 // Returns an array of 24 integers, where index 0 is midnight-1am, index 1 is 1am-2am, etc.
 // Each value is the count of sessions that started in that hour.
 // Assumes sessions is not empty
-// Deprecated: Use ComputeTimeHistogram with a timezone instead
+//
+// Deprecated: Use ComputeTimeHistogram with timezone "UTC" instead.
+// This function will be removed in a future version.
+// Migration example:
+//   histogram := ComputeUTCTimeHistogram(sessions)
+// becomes:
+//   histogram, err := ComputeTimeHistogram(sessions, "UTC")
+//   if err != nil {
+//       // handle error
+//   }
 func ComputeUTCTimeHistogram(sessions []domain.Session) [24]int {
 	loc := time.UTC
 	return computeTimeHistogramInLocation(sessions, loc)

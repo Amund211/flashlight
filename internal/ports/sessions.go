@@ -16,6 +16,20 @@ import (
 	"github.com/Amund211/flashlight/internal/strutils"
 )
 
+// validateAndNormalizeTimezone validates the timezone string and returns the normalized version.
+// If timezone is empty, returns "UTC". Returns error if the timezone is invalid.
+func validateAndNormalizeTimezone(timezone string) (string, error) {
+	if timezone == "" {
+		timezone = "UTC"
+	}
+	// Validate timezone by attempting to load it
+	_, err := time.LoadLocation(timezone)
+	if err != nil {
+		return "", fmt.Errorf("invalid timezone: %w", err)
+	}
+	return timezone, nil
+}
+
 func MakeGetSessionsHandler(
 	getPlayerPITs app.GetPlayerPITs,
 	allowedOrigins *DomainSuffixes,
@@ -132,15 +146,10 @@ func MakeGetSessionsHandler(
 
 		// Validate timezone if provided (before making expensive data fetch)
 		if request.Year != nil {
-			timezone := request.Timezone
-			if timezone == "" {
-				timezone = "UTC"
-			}
-			// Validate timezone by attempting to load it
-			_, err := time.LoadLocation(timezone)
+			_, err := validateAndNormalizeTimezone(request.Timezone)
 			if err != nil {
-				reporting.Report(ctx, fmt.Errorf("invalid timezone: %w", err), map[string]string{
-					"timezone": timezone,
+				reporting.Report(ctx, err, map[string]string{
+					"timezone": request.Timezone,
 				})
 				http.Error(w, "Invalid timezone", http.StatusBadRequest)
 				return
@@ -164,13 +173,17 @@ func MakeGetSessionsHandler(
 		
 		// If year is provided and we have sessions, compute additional stats
 		if request.Year != nil && len(sessions) > 0 {
-			// Default timezone to UTC if not provided
-			timezone := request.Timezone
-			if timezone == "" {
-				timezone = "UTC"
+			// Normalize timezone (validated above, so this should not error)
+			timezone, err := validateAndNormalizeTimezone(request.Timezone)
+			if err != nil {
+				reporting.Report(ctx, fmt.Errorf("unexpected error normalizing timezone: %w", err), map[string]string{
+					"timezone": request.Timezone,
+				})
+				http.Error(w, "Failed to normalize timezone", http.StatusInternalServerError)
+				return
 			}
 			
-			totalSessions := app.ComputeTotalSessions(sessions)
+			totalSessions := len(sessions)
 			totalConsecutiveSessions := app.ComputeTotalConsecutiveSessions(sessions)
 			// We already validated the timezone above, so this should not error
 			timeHistogram, err := app.ComputeTimeHistogram(sessions, timezone)
