@@ -19,23 +19,29 @@ import (
 )
 
 type wrappedResponse struct {
-	Success                bool                       `json:"success"`
-	UUID                   string                     `json:"uuid,omitempty"`
-	Year                   int                        `json:"year,omitempty"`
-	TotalSessions          int                        `json:"totalSessions"`
-	NonConsecutiveSessions int                        `json:"nonConsecutiveSessions"`
-	SessionLengths         *sessionLengthStats        `json:"sessionLengths,omitempty"`
-	SessionsPerMonth       map[int]int                `json:"sessionsPerMonth,omitempty"`
-	BestSessions           *bestSessionsStats         `json:"bestSessions,omitempty"`
-	Averages               *averageStats              `json:"averages,omitempty"`
-	YearStats              *yearBoundaryStats         `json:"yearStats,omitempty"`
-	Winstreaks             *winstreakStats            `json:"winstreaks,omitempty"`
-	FinalKillStreaks       *finalKillStreakStats      `json:"finalKillStreaks,omitempty"`
-	SessionCoverage        *coverageStats             `json:"sessionCoverage,omitempty"`
-	FavoritePlayIntervals  []playIntervalStats        `json:"favoritePlayIntervals,omitempty"`
-	FlawlessSessions       *flawlessSessionStats      `json:"flawlessSessions,omitempty"`
-	PlaytimeDistribution   *playtimeDistributionStats `json:"playtimeDistribution,omitempty"`
-	Cause                  string                     `json:"cause,omitempty"`
+	Success                bool                `json:"success"`
+	UUID                   string              `json:"uuid,omitempty"`
+	Year                   int                 `json:"year,omitempty"`
+	TotalSessions          int                 `json:"totalSessions"`
+	NonConsecutiveSessions int                 `json:"nonConsecutiveSessions"`
+	YearStats              *yearBoundaryStats  `json:"yearStats,omitempty"`
+	SessionStats           *sessionStats       `json:"sessionStats,omitempty"`
+	Cause                  string              `json:"cause,omitempty"`
+}
+
+// sessionStats contains statistics computed from consecutive sessions
+// This field is only present when there is at least one consecutive session
+type sessionStats struct {
+	SessionLengths        sessionLengthStats        `json:"sessionLengths"`
+	SessionsPerMonth      map[int]int               `json:"sessionsPerMonth"`
+	BestSessions          bestSessionsStats         `json:"bestSessions"`
+	Averages              averageStats              `json:"averages"`
+	Winstreaks            winstreakStats            `json:"winstreaks"`
+	FinalKillStreaks      finalKillStreakStats      `json:"finalKillStreaks"`
+	SessionCoverage       coverageStats             `json:"sessionCoverage"`
+	FavoritePlayIntervals []playIntervalStats       `json:"favoritePlayIntervals"`
+	FlawlessSessions      flawlessSessionStats      `json:"flawlessSessions"`
+	PlaytimeDistribution  playtimeDistributionStats `json:"playtimeDistribution"`
 }
 
 type sessionLengthStats struct {
@@ -308,34 +314,33 @@ func computeWrappedStats(ctx context.Context, playerPITs []domain.PlayerPIT, ses
 		Year:                   year,
 		TotalSessions:          len(consecutiveSessions),
 		NonConsecutiveSessions: nonConsecutiveCount,
+		YearStats:              computeYearBoundaryStats(ctx, playerPITs, year),
 	}
 
 	if len(consecutiveSessions) == 0 {
 		return response
 	}
 
-	// Compute all statistics
-	response.SessionLengths = computeSessionLengths(ctx, consecutiveSessions)
-	response.SessionsPerMonth = computeSessionsPerMonth(ctx, consecutiveSessions)
-	response.BestSessions = computeBestSessions(ctx, consecutiveSessions)
-	response.Averages = computeAverages(ctx, consecutiveSessions)
-	response.YearStats = computeYearBoundaryStats(ctx, playerPITs, year)
-	response.Winstreaks = computeWinstreaks(ctx, playerPITs)
-	response.FinalKillStreaks = computeFinalKillStreaks(ctx, playerPITs)
-	response.SessionCoverage = computeCoverage(ctx, playerPITs, consecutiveSessions, year)
-	response.FavoritePlayIntervals = computeFavoritePlayIntervals(ctx, consecutiveSessions)
-	response.FlawlessSessions = computeFlawlessSessions(ctx, consecutiveSessions)
-	response.PlaytimeDistribution = computePlaytimeDistribution(ctx, consecutiveSessions)
+	// Compute all session-dependent statistics
+	response.SessionStats = &sessionStats{
+		SessionLengths:        computeSessionLengths(ctx, consecutiveSessions),
+		SessionsPerMonth:      computeSessionsPerMonth(ctx, consecutiveSessions),
+		BestSessions:          computeBestSessions(ctx, consecutiveSessions),
+		Averages:              computeAverages(ctx, consecutiveSessions),
+		Winstreaks:            computeWinstreaks(ctx, playerPITs),
+		FinalKillStreaks:      computeFinalKillStreaks(ctx, playerPITs),
+		SessionCoverage:       computeCoverage(ctx, playerPITs, consecutiveSessions, year),
+		FavoritePlayIntervals: computeFavoritePlayIntervals(ctx, consecutiveSessions),
+		FlawlessSessions:      computeFlawlessSessions(ctx, consecutiveSessions),
+		PlaytimeDistribution:  computePlaytimeDistribution(ctx, consecutiveSessions),
+	}
 
 	return response
 }
 
 // computeSessionLengths calculates session length statistics
-func computeSessionLengths(ctx context.Context, sessions []domain.Session) *sessionLengthStats {
-	if len(sessions) == 0 {
-		return nil
-	}
-
+// Assumes at least one session exists
+func computeSessionLengths(ctx context.Context, sessions []domain.Session) sessionLengthStats {
 	var total, longest, shortest float64
 	shortest = -1
 
@@ -350,7 +355,7 @@ func computeSessionLengths(ctx context.Context, sessions []domain.Session) *sess
 		}
 	}
 
-	return &sessionLengthStats{
+	return sessionLengthStats{
 		Total:    total,
 		Longest:  longest,
 		Shortest: shortest,
@@ -371,11 +376,8 @@ func computeSessionsPerMonth(ctx context.Context, sessions []domain.Session) map
 }
 
 // computeBestSessions finds sessions with best performance in various categories
-func computeBestSessions(ctx context.Context, sessions []domain.Session) *bestSessionsStats {
-	if len(sessions) == 0 {
-		return nil
-	}
-
+// Assumes at least one session exists
+func computeBestSessions(ctx context.Context, sessions []domain.Session) bestSessionsStats {
 	var bestFKDR, bestKills, bestFinals, bestWins, bestLongest *domain.Session
 	var bestWinsPerHour, bestFinalsPerHour *domain.Session
 	var maxFKDR, maxWinsPerHour, maxFinalsPerHour float64
@@ -446,7 +448,7 @@ func computeBestSessions(ctx context.Context, sessions []domain.Session) *bestSe
 		}
 	}
 
-	result := &bestSessionsStats{}
+	result := bestSessionsStats{}
 
 	if bestFKDR != nil {
 		stats := calculateSessionStats(bestFKDR.Start.Overall, bestFKDR.End.Overall)
@@ -535,11 +537,8 @@ func computeBestSessions(ctx context.Context, sessions []domain.Session) *bestSe
 }
 
 // computeAverages calculates average statistics across all sessions
-func computeAverages(ctx context.Context, sessions []domain.Session) *averageStats {
-	if len(sessions) == 0 {
-		return nil
-	}
-
+// Assumes at least one session exists
+func computeAverages(ctx context.Context, sessions []domain.Session) averageStats {
 	var totalDuration float64
 	var totalGames, totalWins, totalFinalKills int
 
@@ -554,7 +553,7 @@ func computeAverages(ctx context.Context, sessions []domain.Session) *averageSta
 	}
 
 	numSessions := float64(len(sessions))
-	return &averageStats{
+	return averageStats{
 		SessionLength: totalDuration / numSessions,
 		GamesPlayed:   float64(totalGames) / numSessions,
 		Wins:          float64(totalWins) / numSessions,
@@ -598,12 +597,10 @@ func computeYearBoundaryStats(ctx context.Context, playerPITs []domain.PlayerPIT
 }
 
 // computeWinstreaks calculates the highest winstreak for each gamemode during the year
-func computeWinstreaks(ctx context.Context, playerPITs []domain.PlayerPIT) *winstreakStats {
-	if len(playerPITs) == 0 {
-		return nil
-	}
-
-	result := &winstreakStats{}
+// computeWinstreaks calculates the highest winstreak for each gamemode during the year
+// Assumes at least one playerPIT exists
+func computeWinstreaks(ctx context.Context, playerPITs []domain.PlayerPIT) winstreakStats {
+	result := winstreakStats{}
 
 	// Helper to compute winstreak for a gamemode
 	computeGamemodeWinstreak := func(getStats func(*domain.PlayerPIT) domain.GamemodeStatsPIT) *gamemodeWinstreak {
@@ -664,12 +661,9 @@ func computeWinstreaks(ctx context.Context, playerPITs []domain.PlayerPIT) *wins
 }
 
 // computeFinalKillStreaks calculates the highest final kill streak for each gamemode during the year
-func computeFinalKillStreaks(ctx context.Context, playerPITs []domain.PlayerPIT) *finalKillStreakStats {
-	if len(playerPITs) == 0 {
-		return nil
-	}
-
-	result := &finalKillStreakStats{}
+// Assumes at least one playerPIT exists
+func computeFinalKillStreaks(ctx context.Context, playerPITs []domain.PlayerPIT) finalKillStreakStats {
+	result := finalKillStreakStats{}
 
 	// Helper to compute final kill streak for a gamemode
 	computeGamemodeFKStreak := func(getStats func(*domain.PlayerPIT) domain.GamemodeStatsPIT) *gamemodeFinalKillStreak {
@@ -730,11 +724,8 @@ func computeFinalKillStreaks(ctx context.Context, playerPITs []domain.PlayerPIT)
 }
 
 // computeCoverage calculates what percentage of stats were covered by sessions
-func computeCoverage(ctx context.Context, playerPITs []domain.PlayerPIT, sessions []domain.Session, year int) *coverageStats {
-	if len(playerPITs) == 0 {
-		return nil
-	}
-
+// Assumes at least one playerPIT and session exists
+func computeCoverage(ctx context.Context, playerPITs []domain.PlayerPIT, sessions []domain.Session, year int) coverageStats {
 	yearStart := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
 	yearEnd := time.Date(year+1, 1, 1, 0, 0, 0, 0, time.UTC).Add(-time.Nanosecond)
 
@@ -753,14 +744,18 @@ func computeCoverage(ctx context.Context, playerPITs []domain.PlayerPIT, session
 		}
 	}
 
+	// If no PITs in year range, return zero coverage
 	if firstPIT == nil || lastPIT == nil {
-		return nil
+		return coverageStats{
+			GamesPlayedPercentage: 0,
+			AdjustedTotalHours:    0,
+		}
 	}
 
 	// Total games played in year
 	totalGames := lastPIT.Overall.GamesPlayed - firstPIT.Overall.GamesPlayed
 	if totalGames <= 0 {
-		return &coverageStats{
+		return coverageStats{
 			GamesPlayedPercentage: 0,
 			AdjustedTotalHours:    0,
 		}
@@ -787,18 +782,15 @@ func computeCoverage(ctx context.Context, playerPITs []domain.PlayerPIT, session
 		adjustedHours = sessionDuration
 	}
 
-	return &coverageStats{
+	return coverageStats{
 		GamesPlayedPercentage: coverage,
 		AdjustedTotalHours:    adjustedHours,
 	}
 }
 
 // computeFavoritePlayIntervals calculates which time intervals have most playtime
+// Assumes at least one session exists
 func computeFavoritePlayIntervals(ctx context.Context, sessions []domain.Session) []playIntervalStats {
-	if len(sessions) == 0 {
-		return nil
-	}
-
 	// Track playtime in each hour bucket (0-23)
 	hourBuckets := make([]float64, 24)
 	var totalTime float64
@@ -825,7 +817,7 @@ func computeFavoritePlayIntervals(ctx context.Context, sessions []domain.Session
 	}
 
 	if totalTime == 0 {
-		return nil
+		return []playIntervalStats{}
 	}
 
 	// Find top 3 intervals
@@ -878,11 +870,8 @@ func computeFavoritePlayIntervals(ctx context.Context, sessions []domain.Session
 }
 
 // computeFlawlessSessions counts sessions with no losses and no final deaths
-func computeFlawlessSessions(ctx context.Context, sessions []domain.Session) *flawlessSessionStats {
-	if len(sessions) == 0 {
-		return nil
-	}
-
+// Assumes at least one session exists
+func computeFlawlessSessions(ctx context.Context, sessions []domain.Session) flawlessSessionStats {
 	flawlessCount := 0
 	for _, session := range sessions {
 		stats := calculateSessionStats(session.Start.Overall, session.End.Overall)
@@ -893,18 +882,15 @@ func computeFlawlessSessions(ctx context.Context, sessions []domain.Session) *fl
 
 	percentage := float64(flawlessCount) / float64(len(sessions)) * 100
 
-	return &flawlessSessionStats{
+	return flawlessSessionStats{
 		Count:      flawlessCount,
 		Percentage: percentage,
 	}
 }
 
 // computePlaytimeDistribution calculates the distribution of playtime across UTC hours and day-hours
-func computePlaytimeDistribution(ctx context.Context, sessions []domain.Session) *playtimeDistributionStats {
-	if len(sessions) == 0 {
-		return nil
-	}
-
+// Assumes at least one session exists
+func computePlaytimeDistribution(ctx context.Context, sessions []domain.Session) playtimeDistributionStats {
 	var hourlyDistribution [24]float64
 	dayHourDistribution := make(map[string][24]float64)
 
@@ -943,7 +929,7 @@ func computePlaytimeDistribution(ctx context.Context, sessions []domain.Session)
 		}
 	}
 
-	return &playtimeDistributionStats{
+	return playtimeDistributionStats{
 		HourlyDistribution:  hourlyDistribution,
 		DayHourDistribution: dayHourDistribution,
 	}
