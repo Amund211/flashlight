@@ -18,8 +18,13 @@ func TestComputeSessionLengths(t *testing.T) {
 	tests := []struct {
 		name     string
 		sessions []domain.Session
-		want     sessionLengthStats
+		want     *sessionLengthStats
 	}{
+		{
+			name:     "empty sessions",
+			sessions: []domain.Session{},
+			want:     nil,
+		},
 		{
 			name: "single session",
 			sessions: []domain.Session{
@@ -28,7 +33,7 @@ func TestComputeSessionLengths(t *testing.T) {
 					End:   domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 12, 0, 0, 0, time.UTC)).Build(),
 				},
 			},
-			want: sessionLengthStats{
+			want: &sessionLengthStats{
 				Total:    2.0,
 				Longest:  2.0,
 				Shortest: 2.0,
@@ -51,7 +56,7 @@ func TestComputeSessionLengths(t *testing.T) {
 					End:   domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 3, 10, 0, 0, 0, time.UTC)).Build(),
 				},
 			},
-			want: sessionLengthStats{
+			want: &sessionLengthStats{
 				Total:    7.0,
 				Longest:  4.0,
 				Shortest: 1.0,
@@ -64,10 +69,15 @@ func TestComputeSessionLengths(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := computeSessionLengths(ctx, tt.sessions)
-			require.Equal(t, tt.want.Total, got.Total)
-			require.Equal(t, tt.want.Longest, got.Longest)
-			require.Equal(t, tt.want.Shortest, got.Shortest)
-			require.InDelta(t, tt.want.Average, got.Average, 0.0001)
+			if tt.want == nil {
+				require.Nil(t, got)
+			} else {
+				require.NotNil(t, got)
+				require.Equal(t, tt.want.Total, got.Total)
+				require.Equal(t, tt.want.Longest, got.Longest)
+				require.Equal(t, tt.want.Shortest, got.Shortest)
+				require.InDelta(t, tt.want.Average, got.Average, 0.0001)
+			}
 		})
 	}
 }
