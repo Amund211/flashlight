@@ -136,12 +136,12 @@ type flawlessSessionStats struct {
 }
 
 type playtimeDistributionStats struct {
-	// Hours: Array of 24 elements (index 0-23) representing UTC hours
-	// Each element contains the total hours played during that UTC hour
+	// HourlyDistribution: Array of 24 elements (index 0-23) for hours in the specified timezone
+	// Each element contains the total hours played during that hour
 	HourlyDistribution [24]float64 `json:"hourlyDistribution"`
 
 	// DayHourDistribution: Map from weekday name (e.g., "Monday", "Tuesday") to hourly distribution
-	// Each value is an array of 24 elements (index 0-23) for UTC hours on that day
+	// Each value is an array of 24 elements (index 0-23) for hours on that day in the specified timezone
 	// Keys are from time.Weekday.String(): "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 	DayHourDistribution map[string][24]float64 `json:"dayHourDistribution"`
 }
@@ -229,6 +229,23 @@ func MakeGetWrappedHandler(
 			return
 		}
 
+		// Parse and validate timezone parameter (optional, defaults to UTC)
+		timezoneStr := r.URL.Query().Get("timezone")
+		if timezoneStr == "" {
+			timezoneStr = "UTC"
+		}
+		location, err := time.LoadLocation(timezoneStr)
+		if err != nil {
+			statusCode := http.StatusBadRequest
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(statusCode)
+			w.Write([]byte(`{"success":false,"cause":"invalid timezone"}`))
+			return
+		}
+		ctx = logging.AddMetaToContext(ctx,
+			slog.String("timezone", timezoneStr),
+		)
+
 		ctx = reporting.AddExtrasToContext(ctx, map[string]string{
 			"uuid": uuid,
 		})
@@ -257,7 +274,7 @@ func MakeGetWrappedHandler(
 		sessions := app.ComputeSessions(ctx, playerPITs, yearStart, yearEnd)
 
 		// Compute wrapped statistics
-		wrappedData := computeWrappedStats(ctx, playerPITs, sessions, year)
+		wrappedData := computeWrappedStats(ctx, playerPITs, sessions, year, location)
 		wrappedData.Success = true
 		wrappedData.UUID = uuid
 
@@ -297,7 +314,7 @@ func calculateSessionStats(start, end domain.GamemodeStatsPIT) gameStats {
 	}
 }
 
-func computeWrappedStats(ctx context.Context, playerPITs []domain.PlayerPIT, sessions []domain.Session, year int) wrappedResponse {
+func computeWrappedStats(ctx context.Context, playerPITs []domain.PlayerPIT, sessions []domain.Session, year int, location *time.Location) wrappedResponse {
 	// Filter to consecutive sessions only
 	consecutiveSessions := []domain.Session{}
 	nonConsecutiveCount := 0
@@ -332,7 +349,7 @@ func computeWrappedStats(ctx context.Context, playerPITs []domain.PlayerPIT, ses
 		SessionCoverage:       computeCoverage(ctx, playerPITs, consecutiveSessions, year),
 		FavoritePlayIntervals: computeFavoritePlayIntervals(ctx, consecutiveSessions),
 		FlawlessSessions:      computeFlawlessSessions(ctx, consecutiveSessions),
-		PlaytimeDistribution:  computePlaytimeDistribution(ctx, consecutiveSessions),
+		PlaytimeDistribution:  computePlaytimeDistribution(ctx, consecutiveSessions, location),
 	}
 
 	return response
@@ -890,13 +907,14 @@ func computeFlawlessSessions(ctx context.Context, sessions []domain.Session) fla
 
 // computePlaytimeDistribution calculates the distribution of playtime across UTC hours and day-hours
 // Assumes at least one session exists
-func computePlaytimeDistribution(ctx context.Context, sessions []domain.Session) playtimeDistributionStats {
+func computePlaytimeDistribution(ctx context.Context, sessions []domain.Session, location *time.Location) playtimeDistributionStats {
 	var hourlyDistribution [24]float64
 	dayHourDistribution := make(map[string][24]float64)
 
 	for _, session := range sessions {
-		start := session.Start.QueriedAt
-		end := session.End.QueriedAt
+		// Convert UTC times to the specified timezone
+		start := session.Start.QueriedAt.In(location)
+		end := session.End.QueriedAt.In(location)
 
 		// Distribute session time across hour buckets
 		currentTime := start

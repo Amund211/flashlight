@@ -806,12 +806,14 @@ func TestComputePlaytimeDistribution(t *testing.T) {
 	tests := []struct {
 		name                    string
 		sessions                []domain.Session
+		location                *time.Location
 		wantHourlyDistribution  [24]float64
 		wantDayHourDistribution map[string][24]float64
 		wantNil                 bool
 	}{
 		{
-			name: "single session within one hour",
+			name:     "single session within one hour",
+			location: time.UTC,
 			sessions: []domain.Session{
 				{
 					Start: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 10, 0, 0, 0, time.UTC)).
@@ -837,7 +839,8 @@ func TestComputePlaytimeDistribution(t *testing.T) {
 			},
 		},
 		{
-			name: "single session spanning two hours",
+			name:     "single session spanning two hours",
+			location: time.UTC,
 			sessions: []domain.Session{
 				{
 					Start: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 2, 14, 0, 0, 0, time.UTC)).
@@ -866,7 +869,8 @@ func TestComputePlaytimeDistribution(t *testing.T) {
 			},
 		},
 		{
-			name: "session spanning partial hours",
+			name:     "session spanning partial hours",
+			location: time.UTC,
 			sessions: []domain.Session{
 				{
 					Start: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 3, 9, 30, 0, 0, time.UTC)).
@@ -896,7 +900,8 @@ func TestComputePlaytimeDistribution(t *testing.T) {
 			},
 		},
 		{
-			name: "multiple sessions on different days",
+			name:     "multiple sessions on different days",
+			location: time.UTC,
 			sessions: []domain.Session{
 				{
 					// Sunday session
@@ -940,7 +945,8 @@ func TestComputePlaytimeDistribution(t *testing.T) {
 			},
 		},
 		{
-			name: "session crossing midnight",
+			name:     "session crossing midnight",
+			location: time.UTC,
 			sessions: []domain.Session{
 				{
 					Start: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 23, 0, 0, 0, time.UTC)).
@@ -972,12 +978,82 @@ func TestComputePlaytimeDistribution(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "timezone Europe/Oslo - session at noon UTC becomes 1PM/2PM local",
+			location: func() *time.Location {
+				loc, _ := time.LoadLocation("Europe/Oslo")
+				return loc
+			}(),
+			sessions: []domain.Session{
+				{
+					Start: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.June, 15, 12, 0, 0, 0, time.UTC)).
+						WithOverallStats(domaintest.NewStatsBuilder().WithGamesPlayed(0).Build()).
+						Build(),
+					End: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.June, 15, 14, 0, 0, 0, time.UTC)).
+						WithOverallStats(domaintest.NewStatsBuilder().WithGamesPlayed(1).Build()).
+						Build(),
+				},
+			},
+			wantHourlyDistribution: func() [24]float64 {
+				var arr [24]float64
+				arr[14] = 1.0 // 12UTC = 14 CEST (UTC+2 in summer)
+				arr[15] = 1.0 // 13UTC = 15 CEST
+				return arr
+			}(),
+			wantDayHourDistribution: map[string][24]float64{
+				"Thursday": {
+					0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0,
+					10: 0, 11: 0, 12: 0, 13: 0,
+					14: 1.0, // 12UTC = 14 CEST
+					15: 1.0, // 13UTC = 15 CEST
+					16: 0, 17: 0, 18: 0, 19: 0,
+					20: 0, 21: 0, 22: 0, 23: 0,
+				},
+			},
+		},
+		{
+			name: "timezone America/New_York - session at 6AM UTC becomes 1AM/2AM EST",
+			location: func() *time.Location {
+				loc, _ := time.LoadLocation("America/New_York")
+				return loc
+			}(),
+			sessions: []domain.Session{
+				{
+					Start: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 10, 6, 0, 0, 0, time.UTC)).
+						WithOverallStats(domaintest.NewStatsBuilder().WithGamesPlayed(0).Build()).
+						Build(),
+					End: domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 10, 8, 0, 0, 0, time.UTC)).
+						WithOverallStats(domaintest.NewStatsBuilder().WithGamesPlayed(1).Build()).
+						Build(),
+				},
+			},
+			wantHourlyDistribution: func() [24]float64 {
+				var arr [24]float64
+				arr[1] = 1.0 // 6UTC = 1AM EST (UTC-5)
+				arr[2] = 1.0 // 7UTC = 2AM EST
+				return arr
+			}(),
+			wantDayHourDistribution: map[string][24]float64{
+				"Tuesday": {
+					0: 0,
+					1: 1.0, // 6UTC = 1AM EST
+					2: 1.0, // 7UTC = 2AM EST
+					3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0,
+					10: 0, 11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0, 17: 0, 18: 0, 19: 0,
+					20: 0, 21: 0, 22: 0, 23: 0,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := computePlaytimeDistribution(ctx, tt.sessions)
+			location := tt.location
+			if location == nil {
+				location = time.UTC
+			}
+			got := computePlaytimeDistribution(ctx, tt.sessions, location)
 			if tt.wantNil {
 				require.Nil(t, got)
 			} else {
