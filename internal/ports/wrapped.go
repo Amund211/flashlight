@@ -243,7 +243,7 @@ func MakeGetWrappedHandler(
 			statusCode := http.StatusInternalServerError
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(statusCode)
-			w.Write([]byte(`{"success":false,"cause":"Failed to get player data"}`))
+			w.Write([]byte(`{"success":false,"cause":"failed to get player data"}`))
 			return
 		}
 
@@ -263,7 +263,7 @@ func MakeGetWrappedHandler(
 			statusCode := http.StatusInternalServerError
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(statusCode)
-			w.Write([]byte(`{"success":false,"cause":"Failed to marshal response"}`))
+			w.Write([]byte(`{"success":false,"cause":"failed to marshal response"}`))
 			return
 		}
 
@@ -811,14 +811,16 @@ func computeFavoritePlayIntervals(ctx context.Context, sessions []domain.Session
 		start := session.Start.QueriedAt
 		end := session.End.QueriedAt
 
-		for t := start; t.Before(end); t = t.Add(time.Hour) {
+		for t := start; t.Before(end); {
 			hour := t.Hour()
-			remaining := end.Sub(t)
-			if remaining > time.Hour {
-				hourBuckets[hour] += 1.0
-			} else {
-				hourBuckets[hour] += remaining.Hours()
+			// Find the next hour boundary
+			nextHour := time.Date(t.Year(), t.Month(), t.Day(), t.Hour()+1, 0, 0, 0, t.Location())
+			segmentEnd := end
+			if nextHour.Before(end) {
+				segmentEnd = nextHour
 			}
+			hourBuckets[hour] += segmentEnd.Sub(t).Hours()
+			t = segmentEnd
 		}
 	}
 
