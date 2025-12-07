@@ -130,6 +130,23 @@ func MakeGetSessionsHandler(
 			return
 		}
 
+		// Validate timezone if provided (before making expensive data fetch)
+		if request.Year != nil {
+			timezone := request.Timezone
+			if timezone == "" {
+				timezone = "UTC"
+			}
+			// Validate timezone by attempting to load it
+			_, err := time.LoadLocation(timezone)
+			if err != nil {
+				reporting.Report(ctx, fmt.Errorf("invalid timezone: %w", err), map[string]string{
+					"timezone": timezone,
+				})
+				http.Error(w, "Invalid timezone", http.StatusBadRequest)
+				return
+			}
+		}
+
 		// Add some padding on both sides to try to complete sessions that cross the interval borders
 		filterStart := request.Start.Add(-24 * time.Hour)
 		filterEnd := request.End.Add(24 * time.Hour)
@@ -155,12 +172,13 @@ func MakeGetSessionsHandler(
 			
 			totalSessions := app.ComputeTotalSessions(sessions)
 			totalConsecutiveSessions := app.ComputeTotalConsecutiveSessions(sessions)
+			// We already validated the timezone above, so this should not error
 			timeHistogram, err := app.ComputeTimeHistogram(sessions, timezone)
 			if err != nil {
-				reporting.Report(ctx, fmt.Errorf("invalid timezone: %w", err), map[string]string{
+				reporting.Report(ctx, fmt.Errorf("unexpected error computing time histogram: %w", err), map[string]string{
 					"timezone": timezone,
 				})
-				http.Error(w, "Invalid timezone", http.StatusBadRequest)
+				http.Error(w, "Failed to compute time histogram", http.StatusInternalServerError)
 				return
 			}
 			

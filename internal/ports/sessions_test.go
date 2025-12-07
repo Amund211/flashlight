@@ -358,6 +358,7 @@ func TestMakeGetSessionsHandler(t *testing.T) {
 
 		require.Equal(t, http.StatusBadRequest, w.Code)
 		require.Contains(t, w.Body.String(), "Invalid timezone")
-		require.True(t, *called)
+		// Should not call getPlayerPITs when timezone validation fails early
+		require.False(t, *called)
 	})
 }

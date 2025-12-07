@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Amund211/flashlight/internal/app"
 	"github.com/Amund211/flashlight/internal/domain"
 )
 
@@ -148,8 +149,8 @@ func SessionsToRainbowSessionsDataWithStats(
 
 	// Only add computed stats if we have sessions
 	if len(sessions) > 0 {
-		statsAtYearStart := computeStatsAtYearStart(stats, year)
-		statsAtYearEnd := computeStatsAtYearEnd(stats, year)
+		statsAtYearStart := app.ComputeStatsAtYearStart(stats, year)
+		statsAtYearEnd := app.ComputeStatsAtYearEnd(stats, year)
 
 		var rainbowStatsStart *rainbowPlayerDataPIT
 		if statsAtYearStart != nil {
@@ -177,34 +178,4 @@ func SessionsToRainbowSessionsDataWithStats(
 		return nil, fmt.Errorf("failed to marshal sessions response: %w", err)
 	}
 	return responseJSON, nil
-}
-
-func computeStatsAtYearStart(stats []domain.PlayerPIT, year int) *domain.PlayerPIT {
-	var earliest *domain.PlayerPIT
-
-	for i := range stats {
-		stat := &stats[i]
-		if stat.QueriedAt.Year() == year {
-			if earliest == nil || stat.QueriedAt.Before(earliest.QueriedAt) {
-				earliest = stat
-			}
-		}
-	}
-
-	return earliest
-}
-
-func computeStatsAtYearEnd(stats []domain.PlayerPIT, year int) *domain.PlayerPIT {
-	var latest *domain.PlayerPIT
-
-	for i := range stats {
-		stat := &stats[i]
-		if stat.QueriedAt.Year() == year {
-			if latest == nil || stat.QueriedAt.After(latest.QueriedAt) {
-				latest = stat
-			}
-		}
-	}
-
-	return latest
 }
