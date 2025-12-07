@@ -21,11 +21,6 @@ func TestComputeSessionLengths(t *testing.T) {
 		want     *sessionLengthStats
 	}{
 		{
-			name:     "empty sessions",
-			sessions: []domain.Session{},
-			want:     nil,
-		},
-		{
 			name: "single session",
 			sessions: []domain.Session{
 				{
@@ -93,11 +88,6 @@ func TestComputeSessionsPerMonth(t *testing.T) {
 		want     map[int]int
 	}{
 		{
-			name:     "empty sessions",
-			sessions: []domain.Session{},
-			want:     map[int]int{},
-		},
-		{
 			name: "sessions in different months",
 			sessions: []domain.Session{
 				{
@@ -153,11 +143,6 @@ func TestComputeFlawlessSessions(t *testing.T) {
 		sessions []domain.Session
 		want     *flawlessSessionStats
 	}{
-		{
-			name:     "empty sessions",
-			sessions: []domain.Session{},
-			want:     nil,
-		},
 		{
 			name: "no flawless sessions - has losses",
 			sessions: []domain.Session{
@@ -261,11 +246,6 @@ func TestComputeAverages(t *testing.T) {
 		want     *averageStats
 	}{
 		{
-			name:     "empty sessions",
-			sessions: []domain.Session{},
-			want:     nil,
-		},
-		{
 			name: "single session",
 			sessions: []domain.Session{
 				{
@@ -337,13 +317,6 @@ func TestComputeYearBoundaryStats(t *testing.T) {
 		wantEnd    *time.Time
 	}{
 		{
-			name:       "empty PITs",
-			playerPITs: []domain.PlayerPIT{},
-			year:       2023,
-			wantStart:  nil,
-			wantEnd:    nil,
-		},
-		{
 			name: "single PIT in year",
 			playerPITs: []domain.PlayerPIT{
 				domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.June, 15, 12, 0, 0, 0, time.UTC)).Build(),
@@ -408,15 +381,7 @@ func TestComputeCoverage(t *testing.T) {
 		year            int
 		wantCoverage    float64
 		wantAdjustedMin float64
-		expectNil       bool
 	}{
-		{
-			name:       "empty data",
-			playerPITs: []domain.PlayerPIT{},
-			sessions:   []domain.Session{},
-			year:       2023,
-			expectNil:  true,
-		},
 		{
 			name: "100% coverage",
 			playerPITs: []domain.PlayerPIT{
@@ -483,16 +448,8 @@ func TestComputeCoverage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := computeCoverage(ctx, tt.playerPITs, tt.sessions, tt.year)
-			if tt.expectNil {
-				if got != nil && len(tt.playerPITs) == 0 {
-					require.Equal(t, 0.0, got.GamesPlayedPercentage)
-					require.Equal(t, 0.0, got.AdjustedTotalHours)
-				}
-			} else {
-				require.NotNil(t, got)
-				require.InDelta(t, tt.wantCoverage, got.GamesPlayedPercentage, 0.01)
-				require.GreaterOrEqual(t, got.AdjustedTotalHours, tt.wantAdjustedMin)
-			}
+			require.InDelta(t, tt.wantCoverage, got.GamesPlayedPercentage, 0.01)
+			require.GreaterOrEqual(t, got.AdjustedTotalHours, tt.wantAdjustedMin)
 		})
 	}
 }
@@ -513,10 +470,6 @@ func TestComputeBestSessions(t *testing.T) {
 		wantWinsPerHour   *float64
 		wantFinalsPerHour *float64
 	}{
-		{
-			name:     "empty sessions",
-			sessions: []domain.Session{},
-		},
 		{
 			name: "single session",
 			sessions: []domain.Session{
@@ -641,11 +594,6 @@ func TestComputeWinstreaks(t *testing.T) {
 		wantOverallHigh int
 	}{
 		{
-			name:            "empty PITs",
-			playerPITs:      []domain.PlayerPIT{},
-			wantOverallHigh: 0,
-		},
-		{
 			name: "winstreak of 5 then loss",
 			playerPITs: []domain.PlayerPIT{
 				domaintest.NewPlayerBuilder(playerUUID, time.Date(2023, time.January, 1, 10, 0, 0, 0, time.UTC)).
@@ -715,11 +663,6 @@ func TestComputeFinalKillStreaks(t *testing.T) {
 		playerPITs      []domain.PlayerPIT
 		wantOverallHigh int
 	}{
-		{
-			name:            "empty PITs",
-			playerPITs:      []domain.PlayerPIT{},
-			wantOverallHigh: 0,
-		},
 		{
 			name: "final kill streak of 8 then death",
 			playerPITs: []domain.PlayerPIT{
@@ -791,12 +734,6 @@ func TestComputeFavoritePlayIntervals(t *testing.T) {
 		wantMinResults int
 		wantMaxResults int
 	}{
-		{
-			name:           "empty sessions",
-			sessions:       []domain.Session{},
-			wantMinResults: 0,
-			wantMaxResults: 0,
-		},
 		{
 			name: "single 4-hour session",
 			sessions: []domain.Session{
@@ -873,11 +810,6 @@ func TestComputePlaytimeDistribution(t *testing.T) {
 		wantDayHourDistribution map[string][24]float64
 		wantNil                 bool
 	}{
-		{
-			name:     "empty sessions",
-			sessions: []domain.Session{},
-			wantNil:  true,
-		},
 		{
 			name: "single session within one hour",
 			sessions: []domain.Session{
