@@ -19,11 +19,6 @@ func (pb *playerBuilder) WithGamesPlayed(gamesPlayed int) *playerBuilder {
 	return pb
 }
 
-func (pb *playerBuilder) WithQueriedAt(queriedAt time.Time) *playerBuilder {
-	pb.player.QueriedAt = queriedAt
-	return pb
-}
-
 func (pb *playerBuilder) WithExperience(exp int64) *playerBuilder {
 	pb.player.Experience = exp
 	return pb
