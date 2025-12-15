@@ -262,12 +262,14 @@ func (p *Postgres) GetAccountByUsername(ctx context.Context, username string) (d
 	}, nil
 }
 
+const MaxSearchUsernameResults = 100
+
 func (p *Postgres) SearchUsername(ctx context.Context, search string, top int) ([]string, error) {
 	ctx, span := p.tracer.Start(ctx, "Postgres.SearchUsername")
 	defer span.End()
 
-	if top < 1 || top > 100 {
-		err := fmt.Errorf("top must be between 1 and 100")
+	if top < 1 || top > MaxSearchUsernameResults {
+		err := fmt.Errorf("top must be between 1 and %d", MaxSearchUsernameResults)
 		reporting.Report(ctx, err, map[string]string{
 			"top": fmt.Sprintf("%d", top),
 		})
@@ -278,6 +280,12 @@ func (p *Postgres) SearchUsername(ctx context.Context, search string, top int) (
 		PlayerUUID string `db:"player_uuid"`
 	}
 
+	// Query uses trigram similarity for fuzzy username matching
+	// NOTE: For optimal performance in production, create a GIN index:
+	//   CREATE INDEX idx_username_queries_username_trgm
+	//     ON username_queries USING gin (username gin_trgm_ops);
+	// The WHERE clause filters by similarity > 0 to exclude non-matches early.
+	// Results are grouped by player_uuid to get unique UUIDs with their best match.
 	var results []result
 	err := p.db.SelectContext(ctx, &results, fmt.Sprintf(`
 		WITH ranked_matches AS (

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/Amund211/flashlight/internal/adapters/accountrepository"
 	"github.com/Amund211/flashlight/internal/app"
 	"github.com/Amund211/flashlight/internal/logging"
 	"github.com/Amund211/flashlight/internal/ratelimiting"
@@ -110,7 +111,7 @@ func MakeSearchUsernameHandler(
 		if topStr != "" {
 			var err error
 			top, err = strconv.Atoi(topStr)
-			if err != nil || top < 1 || top > 100 {
+			if err != nil || top < 1 || top > accountrepository.MaxSearchUsernameResults {
 				handleError(ctx, "invalid top parameter", http.StatusBadRequest)
 				return
 			}
@@ -151,11 +152,11 @@ func makeSearchUsernameSuccessResponse(ctx context.Context, uuids []string) ([]b
 }
 
 func makeSearchUsernameErrorResponse(ctx context.Context, cause string) ([]byte, error) {
-	type errorResponse struct {
+	// Use searchUsernameResponse but with nil UUIDs to avoid including empty array in error response
+	resp := struct {
 		Success bool   `json:"success"`
 		Cause   string `json:"cause"`
-	}
-	resp := errorResponse{
+	}{
 		Success: false,
 		Cause:   cause,
 	}
