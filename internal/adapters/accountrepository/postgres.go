@@ -301,7 +301,8 @@ func (p *Postgres) SearchUsername(ctx context.Context, searchTerm string, top in
 		return nil, err
 	}
 
-	uuids := []string{} // Initialize to empty slice, not nil
+	// Initialize to empty slice instead of nil for consistent JSON marshaling ([] vs null)
+	uuids := []string{}
 	err = txx.SelectContext(ctx, &uuids, `
 		SELECT player_uuid
 		FROM usernames

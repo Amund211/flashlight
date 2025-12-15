@@ -126,8 +126,7 @@ func MakeSearchUsernameHandler(
 		if _, err = w.Write(responseData); err != nil {
 			logging.FromContext(ctx).ErrorContext(ctx, "Failed to write response", "error", err)
 			reporting.Report(ctx, fmt.Errorf("failed to write search username response: %w", err))
-
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			// Cannot call http.Error here since headers and status are already sent
 			return
 		}
 	}
