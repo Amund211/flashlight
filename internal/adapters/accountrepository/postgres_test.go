@@ -49,6 +49,12 @@ func TestPostgres(t *testing.T) {
 	db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
 	require.NoError(t, err)
 
+	// Enable pg_trgm extension at database level once for all tests
+	// This is required for the SearchUsername functionality
+	_, err = db.ExecContext(ctx, "CREATE EXTENSION IF NOT EXISTS pg_trgm")
+	require.NoError(t, err, "pg_trgm extension is required for SearchUsername tests. "+
+		"Ensure postgresql-contrib is installed and the extension is available.")
+
 	now := time.Now()
 
 	t.Run("Store/RemoveUsername", func(t *testing.T) {
