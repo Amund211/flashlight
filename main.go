@@ -176,6 +176,8 @@ func main() {
 		getAndPersistPlayerWithCache,
 	)
 
+	searchUsername := app.BuildSearchUsername(accountRepo)
+
 	mux := http.NewServeMux()
 
 	handleFunc := func(pattern string, handlerFunc http.HandlerFunc) {
@@ -234,6 +236,20 @@ func main() {
 			getAccountByUUIDWithCache,
 			allowedOrigins,
 			logger.With("port", "getaccountbyuuid"),
+			sentryMiddleware,
+		),
+	)
+
+	handleFunc(
+		"OPTIONS /v1/username/search",
+		ports.BuildCORSHandler(allowedOrigins),
+	)
+	handleFunc(
+		"GET /v1/username/search",
+		ports.MakeSearchUsernameHandler(
+			searchUsername,
+			allowedOrigins,
+			logger.With("port", "searchusername"),
 			sentryMiddleware,
 		),
 	)
