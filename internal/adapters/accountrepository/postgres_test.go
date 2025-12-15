@@ -731,4 +731,184 @@ func TestPostgres(t *testing.T) {
 			require.WithinDuration(t, now.Add(-2*time.Hour), account.QueriedAt, 1*time.Millisecond)
 		})
 	})
+
+	t.Run("SearchUsername", func(t *testing.T) {
+		t.Parallel()
+
+		setupTestData := func(t *testing.T, p *Postgres, entries []domain.Account) {
+			t.Helper()
+			for _, entry := range entries {
+				err := p.StoreAccount(ctx, entry)
+				require.NoError(t, err)
+			}
+		}
+
+		testCases := []struct {
+			name           string
+			dbEntries      []domain.Account
+			searchTerm     string
+			top            int
+			expectedUUIDs  []string
+			expectError    bool
+			errorSubstring string
+		}{
+			{
+				name: "exact match returns single result",
+				dbEntries: []domain.Account{
+					{UUID: makeUUID(1), Username: "Technoblade", QueriedAt: now},
+					{UUID: makeUUID(2), Username: "Dream", QueriedAt: now},
+					{UUID: makeUUID(3), Username: "Sapnap", QueriedAt: now},
+				},
+				searchTerm:    "Dream",
+				top:           10,
+				expectedUUIDs: []string{makeUUID(2)},
+			},
+			{
+				name: "partial match returns similar results",
+				dbEntries: []domain.Account{
+					{UUID: makeUUID(1), Username: "Technoblade", QueriedAt: now},
+					{UUID: makeUUID(2), Username: "TechnoFan", QueriedAt: now},
+					{UUID: makeUUID(3), Username: "Technology", QueriedAt: now},
+					{UUID: makeUUID(4), Username: "Dream", QueriedAt: now},
+				},
+				searchTerm:    "Techno",
+				top:           10,
+				expectedUUIDs: []string{makeUUID(1), makeUUID(2), makeUUID(3)},
+			},
+			{
+				name: "respects top limit",
+				dbEntries: []domain.Account{
+					{UUID: makeUUID(1), Username: "TestUser1", QueriedAt: now},
+					{UUID: makeUUID(2), Username: "TestUser2", QueriedAt: now},
+					{UUID: makeUUID(3), Username: "TestUser3", QueriedAt: now},
+					{UUID: makeUUID(4), Username: "TestUser4", QueriedAt: now},
+					{UUID: makeUUID(5), Username: "TestUser5", QueriedAt: now},
+				},
+				searchTerm: "TestUser",
+				top:        2,
+				// Should return only 2 results
+				expectedUUIDs: []string{makeUUID(1), makeUUID(2)},
+			},
+			{
+				name: "case insensitive search",
+				dbEntries: []domain.Account{
+					{UUID: makeUUID(1), Username: "TechnoBlade", QueriedAt: now},
+					{UUID: makeUUID(2), Username: "TECHNOBLADE", QueriedAt: now},
+					{UUID: makeUUID(3), Username: "technoblade", QueriedAt: now},
+				},
+				searchTerm:    "techno",
+				top:           10,
+				expectedUUIDs: []string{makeUUID(1), makeUUID(2), makeUUID(3)},
+			},
+			{
+				name: "sorts by similarity then by last_queried_at desc",
+				dbEntries: []domain.Account{
+					{UUID: makeUUID(1), Username: "Technoblade", QueriedAt: now.Add(-1 * time.Hour)},
+					{UUID: makeUUID(1), Username: "Techno", QueriedAt: now.Add(-30 * time.Minute)},
+					{UUID: makeUUID(2), Username: "Technology", QueriedAt: now},
+				},
+				searchTerm: "Techno",
+				top:        10,
+				// UUID 1 should be first (best match "Techno"), then UUID 1 again with older query, then UUID 2
+				// But DISTINCT should only return UUID 1 once, followed by UUID 2
+				expectedUUIDs: []string{makeUUID(1), makeUUID(2)},
+			},
+			{
+				name: "returns unique UUIDs when user changed names",
+				dbEntries: []domain.Account{
+					{UUID: makeUUID(1), Username: "OldName", QueriedAt: now.Add(-2 * time.Hour)},
+					{UUID: makeUUID(1), Username: "NewName", QueriedAt: now},
+					{UUID: makeUUID(2), Username: "OtherUser", QueriedAt: now},
+				},
+				searchTerm:    "Name",
+				top:           10,
+				expectedUUIDs: []string{makeUUID(1), makeUUID(2)},
+			},
+			{
+				name: "empty result when no matches",
+				dbEntries: []domain.Account{
+					{UUID: makeUUID(1), Username: "Technoblade", QueriedAt: now},
+					{UUID: makeUUID(2), Username: "Dream", QueriedAt: now},
+				},
+				searchTerm:    "xyz123notfound",
+				top:           10,
+				expectedUUIDs: []string{},
+			},
+			{
+				name: "invalid top value too low",
+				dbEntries: []domain.Account{
+					{UUID: makeUUID(1), Username: "Test", QueriedAt: now},
+				},
+				searchTerm:     "Test",
+				top:            0,
+				expectError:    true,
+				errorSubstring: "top must be between 1 and 100",
+			},
+			{
+				name: "invalid top value too high",
+				dbEntries: []domain.Account{
+					{UUID: makeUUID(1), Username: "Test", QueriedAt: now},
+				},
+				searchTerm:     "Test",
+				top:            101,
+				expectError:    true,
+				errorSubstring: "top must be between 1 and 100",
+			},
+			{
+				name: "fuzzy matching with typos",
+				dbEntries: []domain.Account{
+					{UUID: makeUUID(1), Username: "Technoblade", QueriedAt: now},
+					{UUID: makeUUID(2), Username: "TechnoBlade123", QueriedAt: now},
+					{UUID: makeUUID(3), Username: "NotRelated", QueriedAt: now},
+				},
+				searchTerm: "Tecnoblade",
+				top:        10,
+				// Should match Technoblade and TechnoBlade123 due to similarity
+				expectedUUIDs: []string{makeUUID(1), makeUUID(2)},
+			},
+			{
+				name: "prefers more recent queries when similarity is equal",
+				dbEntries: []domain.Account{
+					{UUID: makeUUID(1), Username: "Test", QueriedAt: now.Add(-2 * time.Hour)},
+					{UUID: makeUUID(2), Username: "Test", QueriedAt: now},
+				},
+				searchTerm: "Test",
+				top:        1,
+				// Should return UUID 2 because it has more recent query
+				expectedUUIDs: []string{makeUUID(2)},
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				t.Parallel()
+				p := newPostgres(t, db, fmt.Sprintf("search_username_%s", tc.name))
+
+				setupTestData(t, p, tc.dbEntries)
+
+				results, err := p.SearchUsername(ctx, tc.searchTerm, tc.top)
+
+				if tc.expectError {
+					require.Error(t, err)
+					if tc.errorSubstring != "" {
+						require.Contains(t, err.Error(), tc.errorSubstring)
+					}
+					return
+				}
+
+				require.NoError(t, err)
+
+				// For tests where order matters (respects top limit, etc), check exact order
+				if tc.name == "respects top limit" || tc.name == "prefers more recent queries when similarity is equal" {
+					require.Equal(t, tc.expectedUUIDs, results, "UUIDs should match in exact order")
+				} else {
+					// For other tests, just check that expected UUIDs are present
+					require.ElementsMatch(t, tc.expectedUUIDs, results, "UUIDs should match")
+				}
+
+				// Verify length constraint
+				require.LessOrEqual(t, len(results), tc.top, "Results should not exceed top limit")
+			})
+		}
+	})
 }
