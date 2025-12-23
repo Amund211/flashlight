@@ -261,3 +261,71 @@ func (p *Postgres) GetAccountByUsername(ctx context.Context, username string) (d
 		QueriedAt: entry.QueriedAt,
 	}, nil
 }
+
+const MaxSearchUsernameResults = 100
+
+func (p *Postgres) SearchUsername(ctx context.Context, search string, top int) ([]string, error) {
+	ctx, span := p.tracer.Start(ctx, "Postgres.SearchUsername")
+	defer span.End()
+
+	if top < 1 || top > MaxSearchUsernameResults {
+		err := fmt.Errorf("top must be between 1 and %d", MaxSearchUsernameResults)
+		reporting.Report(ctx, err, map[string]string{
+			"top": fmt.Sprintf("%d", top),
+		})
+		return nil, err
+	}
+
+	type result struct {
+		PlayerUUID string `db:"player_uuid"`
+	}
+
+	// Query uses trigram similarity for fuzzy username matching
+	// NOTE: For optimal performance in production, create a GIN index:
+	//   CREATE INDEX idx_username_queries_username_trgm
+	//     ON username_queries USING gin (username gin_trgm_ops);
+	// The WHERE clause filters by similarity > 0 to exclude non-matches early.
+	// Results are grouped by player_uuid to get unique UUIDs with their best match.
+	var results []result
+	err := p.db.SelectContext(ctx, &results, fmt.Sprintf(`
+		WITH ranked_matches AS (
+			SELECT 
+				player_uuid,
+				MAX(similarity(username, $1)) as max_similarity,
+				MAX(last_queried_at) as max_last_queried_at
+			FROM %s.username_queries
+			WHERE similarity(username, $1) > 0
+			GROUP BY player_uuid
+		)
+		SELECT player_uuid
+		FROM ranked_matches
+		ORDER BY max_similarity DESC, max_last_queried_at DESC
+		LIMIT $2`,
+		pq.QuoteIdentifier(p.schema),
+	),
+		search,
+		top,
+	)
+	if err != nil {
+		err := fmt.Errorf("failed to search username: %w", err)
+		reporting.Report(ctx, err, map[string]string{
+			"search": search,
+			"top":    fmt.Sprintf("%d", top),
+		})
+		return nil, err
+	}
+
+	uuids := make([]string, 0, len(results))
+	for _, r := range results {
+		if !strutils.UUIDIsNormalized(r.PlayerUUID) {
+			err := fmt.Errorf("uuid is not normalized")
+			reporting.Report(ctx, err, map[string]string{
+				"uuid": r.PlayerUUID,
+			})
+			return nil, err
+		}
+		uuids = append(uuids, r.PlayerUUID)
+	}
+
+	return uuids, nil
+}
