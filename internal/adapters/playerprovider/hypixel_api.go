@@ -149,6 +149,8 @@ func (hypixelAPI hypixelAPIImpl) GetPlayerData(ctx context.Context, uuid string)
 				limit = parsedLimit
 				hasLimit = true
 				hypixelAPI.metrics.rateLimitLimit.Record(ctx, limit)
+			} else {
+				logging.FromContext(ctx).WarnContext(ctx, "Failed to parse RateLimit-Limit header", "value", rateLimitStr, "error", err)
 			}
 		}
 
@@ -157,6 +159,8 @@ func (hypixelAPI hypixelAPIImpl) GetPlayerData(ctx context.Context, uuid string)
 				remaining = parsedRemaining
 				hasRemaining = true
 				hypixelAPI.metrics.rateLimitRemaining.Record(ctx, remaining)
+			} else {
+				logging.FromContext(ctx).WarnContext(ctx, "Failed to parse RateLimit-Remaining header", "value", rateLimitStr, "error", err)
 			}
 		}
 
