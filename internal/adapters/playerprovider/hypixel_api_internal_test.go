@@ -105,7 +105,7 @@ type mockGauge struct {
 func (g *mockGauge) Record(ctx context.Context, value int64, options ...metric.RecordOption) {
 	g.lastValue = value
 	g.recorded = true
-	
+
 	cfg := metric.NewRecordConfig(options)
 	attrs := cfg.Attributes()
 	iter := attrs.Iter()
@@ -127,7 +127,7 @@ type mockCounter struct {
 func (c *mockCounter) Add(ctx context.Context, value int64, options ...metric.AddOption) {
 	c.lastValue += value
 	c.recorded = true
-	
+
 	cfg := metric.NewAddConfig(options)
 	attrs := cfg.Attributes()
 	iter := attrs.Iter()
@@ -158,7 +158,7 @@ func TestGetPlayerDataRateLimitHeaders(t *testing.T) {
 		t.Parallel()
 
 		mockMeter := newMockMeter()
-		
+
 		headers := http.Header{}
 		headers.Set("RateLimit-Limit", "120")
 		headers.Set("RateLimit-Remaining", "100")
@@ -212,7 +212,7 @@ func TestGetPlayerDataRateLimitHeaders(t *testing.T) {
 		t.Parallel()
 
 		mockMeter := newMockMeter()
-		
+
 		headers := http.Header{}
 		headers.Set("RateLimit-Limit", "120")
 
@@ -263,7 +263,7 @@ func TestGetPlayerDataRateLimitHeaders(t *testing.T) {
 		t.Parallel()
 
 		mockMeter := newMockMeter()
-		
+
 		headers := http.Header{}
 		headers.Set("RateLimit-Remaining", "100")
 
@@ -314,7 +314,7 @@ func TestGetPlayerDataRateLimitHeaders(t *testing.T) {
 		t.Parallel()
 
 		mockMeter := newMockMeter()
-		
+
 		headers := http.Header{}
 
 		httpClient := &mockedHttpClient{
@@ -363,7 +363,7 @@ func TestGetPlayerDataRateLimitHeaders(t *testing.T) {
 		t.Parallel()
 
 		mockMeter := newMockMeter()
-		
+
 		headers := http.Header{}
 		headers.Set("RateLimit-Limit", "invalid")
 		headers.Set("RateLimit-Remaining", "100")
@@ -416,7 +416,7 @@ func TestGetPlayerDataRateLimitHeaders(t *testing.T) {
 		t.Parallel()
 
 		mockMeter := newMockMeter()
-		
+
 		headers := http.Header{}
 		headers.Set("RateLimit-Limit", "120")
 		headers.Set("RateLimit-Remaining", "not-a-number")
@@ -469,7 +469,7 @@ func TestGetPlayerDataRateLimitHeaders(t *testing.T) {
 		t.Parallel()
 
 		mockMeter := newMockMeter()
-		
+
 		headers := http.Header{}
 		headers.Set("RateLimit-Limit", "abc")
 		headers.Set("RateLimit-Remaining", "xyz")
@@ -521,7 +521,7 @@ func TestGetPlayerDataRateLimitHeaders(t *testing.T) {
 		t.Parallel()
 
 		mockMeter := newMockMeter()
-		
+
 		headers := http.Header{}
 		headers.Set("RateLimit-Limit", "-10")
 		headers.Set("RateLimit-Remaining", "-5")
@@ -576,7 +576,7 @@ func TestGetPlayerDataRateLimitHeaders(t *testing.T) {
 		t.Parallel()
 
 		mockMeter := newMockMeter()
-		
+
 		headers := http.Header{}
 		headers.Set("RateLimit-Limit", "0")
 		headers.Set("RateLimit-Remaining", "0")
@@ -630,7 +630,7 @@ func TestGetPlayerDataRateLimitHeaders(t *testing.T) {
 		t.Parallel()
 
 		mockMeter := newMockMeter()
-		
+
 		headers := http.Header{}
 		headers.Set("RateLimit-Limit", "9223372036854775807") // max int64
 		headers.Set("RateLimit-Remaining", "9223372036854775806")
