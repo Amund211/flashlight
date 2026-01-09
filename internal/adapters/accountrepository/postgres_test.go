@@ -731,4 +731,144 @@ func TestPostgres(t *testing.T) {
 			require.WithinDuration(t, now.Add(-2*time.Hour), account.QueriedAt, 1*time.Millisecond)
 		})
 	})
+
+	t.Run("SearchUsername", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name       string
+			accounts   []domain.Account
+			searchTerm string
+			top        int
+			expected   []string
+		}{
+			{
+				name: "exact match",
+				accounts: []domain.Account{
+					{UUID: makeUUID(1), Username: "testuser", QueriedAt: now},
+					{UUID: makeUUID(2), Username: "anotheruser", QueriedAt: now},
+				},
+				searchTerm: "testuser",
+				top:        10,
+				expected:   []string{makeUUID(1)},
+			},
+			{
+				name: "partial match with similarity",
+				accounts: []domain.Account{
+					{UUID: makeUUID(1), Username: "testuser", QueriedAt: now},
+					{UUID: makeUUID(2), Username: "testing", QueriedAt: now},
+					{UUID: makeUUID(3), Username: "tests", QueriedAt: now},
+					{UUID: makeUUID(4), Username: "unrelated", QueriedAt: now},
+				},
+				searchTerm: "test",
+				top:        10,
+				// Based on trigram similarity: "tests" is most similar, then "testing", then "testuser"
+				expected:   []string{makeUUID(3), makeUUID(2), makeUUID(1)},
+			},
+			{
+				name: "limit results with top",
+				accounts: []domain.Account{
+					{UUID: makeUUID(1), Username: "testuser1", QueriedAt: now},
+					{UUID: makeUUID(2), Username: "testuser2", QueriedAt: now},
+					{UUID: makeUUID(3), Username: "testuser3", QueriedAt: now},
+				},
+				searchTerm: "test",
+				top:        2,
+				expected:   []string{makeUUID(1), makeUUID(2)},
+			},
+			{
+				name: "secondary sort by queried_at",
+				accounts: []domain.Account{
+					{UUID: makeUUID(1), Username: "user1", QueriedAt: now.Add(-2 * time.Hour)},
+					{UUID: makeUUID(2), Username: "user2", QueriedAt: now.Add(-1 * time.Hour)},
+					{UUID: makeUUID(3), Username: "user3", QueriedAt: now},
+				},
+				searchTerm: "user",
+				top:        10,
+				// All three have similar trigram similarity, sorted by queried_at DESC
+				expected:   []string{makeUUID(3), makeUUID(2), makeUUID(1)},
+			},
+			{
+				name: "case insensitive search",
+				accounts: []domain.Account{
+					{UUID: makeUUID(1), Username: "TestUser", QueriedAt: now},
+					{UUID: makeUUID(2), Username: "testuser", QueriedAt: now},
+				},
+				searchTerm: "TESTUSER",
+				top:        10,
+				// Only UUID 2 remains because storing "testuser" deletes "TestUser" (case-insensitive)
+				expected:   []string{makeUUID(2)},
+			},
+			{
+				name: "no matches below threshold",
+				accounts: []domain.Account{
+					{UUID: makeUUID(1), Username: "apple", QueriedAt: now},
+					{UUID: makeUUID(2), Username: "banana", QueriedAt: now},
+				},
+				searchTerm: "xyz",
+				top:        10,
+				expected:   []string{},
+			},
+			{
+				name: "typo tolerance",
+				accounts: []domain.Account{
+					{UUID: makeUUID(1), Username: "player123", QueriedAt: now},
+					{UUID: makeUUID(2), Username: "plaeyr123", QueriedAt: now},
+					{UUID: makeUUID(3), Username: "different", QueriedAt: now},
+				},
+				searchTerm: "player",
+				top:        10,
+				expected:   []string{makeUUID(1), makeUUID(2)},
+			},
+			{
+				name: "empty database",
+				accounts: []domain.Account{},
+				searchTerm: "anything",
+				top:        10,
+				expected:   []string{},
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				schemaName := fmt.Sprintf("search_username_%s", tt.name)
+				p := newPostgres(t, db, schemaName)
+
+				// Store accounts
+				for _, account := range tt.accounts {
+					err := p.StoreAccount(ctx, account)
+					require.NoError(t, err)
+				}
+
+				// Execute search
+				results, err := p.SearchUsername(ctx, tt.searchTerm, tt.top)
+				require.NoError(t, err)
+
+				// Verify results
+				require.Equal(t, tt.expected, results, "Search results do not match expected UUIDs")
+			})
+		}
+
+		t.Run("invalid top value too low", func(t *testing.T) {
+			t.Parallel()
+
+			p := newPostgres(t, db, "search_username_invalid_top_low")
+
+			_, err := p.SearchUsername(ctx, "test", 0)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "top must be between 1 and 100")
+		})
+
+		t.Run("invalid top value too high", func(t *testing.T) {
+			t.Parallel()
+
+			p := newPostgres(t, db, "search_username_invalid_top_high")
+
+			_, err := p.SearchUsername(ctx, "test", 101)
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "top must be between 1 and 100")
+		})
+	})
 }
