@@ -109,7 +109,6 @@ func MakeGetPlayerDataHandler(
 
 		_, err = registerUserVisit(ctx, userID)
 		if err != nil {
-			reporting.Report(ctx, fmt.Errorf("failed to register user visit: %w", err))
 			statusCode := http.StatusInternalServerError
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(statusCode)

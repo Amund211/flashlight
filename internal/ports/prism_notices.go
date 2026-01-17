@@ -106,7 +106,6 @@ func MakePrismNoticesHandler(
 
 		_, err := registerUserVisit(ctx, userID)
 		if err != nil {
-			reporting.Report(ctx, fmt.Errorf("failed to register user visit: %w", err))
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}

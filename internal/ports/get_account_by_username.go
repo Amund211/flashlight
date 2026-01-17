@@ -101,7 +101,6 @@ func MakeGetAccountByUsernameHandler(
 
 		_, err := registerUserVisit(ctx, userID)
 		if err != nil {
-			reporting.Report(ctx, fmt.Errorf("failed to register user visit: %w", err))
 			handleError(ctx, "internal server error", http.StatusInternalServerError)
 			return
 		}
