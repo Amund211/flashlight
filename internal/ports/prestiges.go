@@ -111,17 +111,14 @@ func MakeGetPrestigesHandler(
 		})
 		ctx = logging.AddMetaToContext(ctx, slog.String("normalizedUUID", uuid))
 
-		// Register user visit if userID is present
-		if userID != "" && userID != "<missing>" {
-			_, err := registerUserVisit(ctx, userID)
-			if err != nil {
-				reporting.Report(ctx, fmt.Errorf("failed to register user visit: %w", err))
-				statusCode := http.StatusInternalServerError
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(statusCode)
-				w.Write([]byte(`{"success":false,"cause":"Internal server error"}`))
-				return
-			}
+		_, err = registerUserVisit(ctx, userID)
+		if err != nil {
+			reporting.Report(ctx, fmt.Errorf("failed to register user visit: %w", err))
+			statusCode := http.StatusInternalServerError
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(statusCode)
+			w.Write([]byte(`{"success":false,"cause":"Internal server error"}`))
+			return
 		}
 
 		// Generate hardcoded milestones: multiples of 100 up to 10,000

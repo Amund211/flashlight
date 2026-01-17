@@ -104,14 +104,11 @@ func MakePrismNoticesHandler(
 			},
 		)
 
-		// Register user visit if userID is present
-		if userID != "" && userID != "<missing>" {
-			_, err := registerUserVisit(ctx, userID)
-			if err != nil {
-				reporting.Report(ctx, fmt.Errorf("failed to register user visit: %w", err))
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
-				return
-			}
+		_, err := registerUserVisit(ctx, userID)
+		if err != nil {
+			reporting.Report(ctx, fmt.Errorf("failed to register user visit: %w", err))
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
 		}
 
 		notices, err := noticesForCall(ctx, userIDType(userID), prismVersionType(prismVersion), time.Now())

@@ -107,18 +107,15 @@ func MakeGetPlayerDataHandler(
 			},
 		)
 
-		// Register user visit if userID is present
-		if userID != "" && userID != "<missing>" {
-			_, err := registerUserVisit(ctx, userID)
-			if err != nil {
-				reporting.Report(ctx, fmt.Errorf("failed to register user visit: %w", err))
-				statusCode := http.StatusInternalServerError
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(statusCode)
-				w.Write([]byte(`{"success":false,"cause":"Internal server error"}`))
-				logging.FromContext(ctx).InfoContext(ctx, "Returning response", "statusCode", statusCode, "reason", "register user visit failed")
-				return
-			}
+		_, err = registerUserVisit(ctx, userID)
+		if err != nil {
+			reporting.Report(ctx, fmt.Errorf("failed to register user visit: %w", err))
+			statusCode := http.StatusInternalServerError
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(statusCode)
+			w.Write([]byte(`{"success":false,"cause":"Internal server error"}`))
+			logging.FromContext(ctx).InfoContext(ctx, "Returning response", "statusCode", statusCode, "reason", "register user visit failed")
+			return
 		}
 
 		player, err := getAndPersistPlayerWithCache(ctx, uuid)

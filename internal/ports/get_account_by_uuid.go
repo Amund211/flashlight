@@ -99,14 +99,11 @@ func MakeGetAccountByUUIDHandler(
 			},
 		)
 
-		// Register user visit if userID is present
-		if userID != "" && userID != "<missing>" {
-			_, err := registerUserVisit(ctx, userID)
-			if err != nil {
-				reporting.Report(ctx, fmt.Errorf("failed to register user visit: %w", err))
-				handleError(ctx, "internal server error", http.StatusInternalServerError)
-				return
-			}
+		_, err = registerUserVisit(ctx, userID)
+		if err != nil {
+			reporting.Report(ctx, fmt.Errorf("failed to register user visit: %w", err))
+			handleError(ctx, "internal server error", http.StatusInternalServerError)
+			return
 		}
 
 		account, err := getAccountByUUID(ctx, uuid)
