@@ -1,6 +1,8 @@
 package userrepository
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -15,7 +17,7 @@ import (
 	"github.com/Amund211/flashlight/internal/adapters/database"
 )
 
-func newPostgres(t *testing.T, db *sqlx.DB, schemaSuffix string) *Postgres {
+func newPostgres(t *testing.T, db *sqlx.DB, schemaSuffix string) (*Postgres, string) {
 	require.NotEmpty(t, schemaSuffix, "schemaSuffix must not be empty")
 	schema := fmt.Sprintf("users_repo_test_%s", schemaSuffix)
 
@@ -28,7 +30,7 @@ func newPostgres(t *testing.T, db *sqlx.DB, schemaSuffix string) *Postgres {
 	err := migrator.Migrate(t.Context(), schema)
 	require.NoError(t, err)
 
-	return NewPostgres(db, schema)
+	return NewPostgres(db, schema), schema
 }
 
 func TestPostgresRegisterVisit(t *testing.T) {
@@ -36,6 +38,9 @@ func TestPostgresRegisterVisit(t *testing.T) {
 		t.Skip("skipping db tests in short mode.")
 	}
 	t.Parallel()
+
+	db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
+	require.NoError(t, err)
 
 	getStoredUser := func(t *testing.T, db *sqlx.DB, schema string, userID string) *dbUser {
 		t.Helper()
@@ -55,9 +60,10 @@ func TestPostgresRegisterVisit(t *testing.T) {
 			"SELECT user_id, first_seen_at, last_seen_at, seen_count FROM users WHERE user_id = $1",
 			userID,
 		).Scan(&user.UserID, &user.FirstSeenAt, &user.LastSeenAt, &user.SeenCount)
-		if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}
+		require.NoError(t, err)
 
 		return &user
 	}
@@ -67,10 +73,7 @@ func TestPostgresRegisterVisit(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			ctx := t.Context()
 
-			db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
-			require.NoError(t, err)
-			schema := "first_visit"
-			p := newPostgres(t, db, schema)
+			p, schema := newPostgres(t, db, "first_visit")
 			userID := "test-user-1"
 
 			start := time.Now()
@@ -101,10 +104,7 @@ func TestPostgresRegisterVisit(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			ctx := t.Context()
 
-			db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
-			require.NoError(t, err)
-			schema := "second_visit"
-			p := newPostgres(t, db, schema)
+			p, schema := newPostgres(t, db, "second_visit")
 			userID := "test-user-2"
 
 			first := time.Now()
@@ -144,10 +144,7 @@ func TestPostgresRegisterVisit(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			ctx := t.Context()
 
-			db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
-			require.NoError(t, err)
-			schema := "multiple_visits"
-			p := newPostgres(t, db, schema)
+			p, schema := newPostgres(t, db, "multiple_visits")
 			userID := "test-user-3"
 
 			start := time.Now()
@@ -175,10 +172,7 @@ func TestPostgresRegisterVisit(t *testing.T) {
 		t.Parallel()
 		ctx := t.Context()
 
-		db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
-		require.NoError(t, err)
-		schema := "multiple_users"
-		p := newPostgres(t, db, schema)
+		p, schema := newPostgres(t, db, "multiple_users")
 		user1ID := "test-user-4"
 		user2ID := "test-user-5"
 
@@ -210,23 +204,27 @@ func TestPostgresRegisterVisit(t *testing.T) {
 		t.Parallel()
 		ctx := t.Context()
 
-		db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
-		require.NoError(t, err)
-		p := newPostgres(t, db, "empty_userid")
+		p, _ := newPostgres(t, db, "empty_userid")
 
 		_, err = p.RegisterVisit(ctx, "")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "userID is empty")
 	})
 
+	t.Run("new user has no entry", func(t *testing.T) {
+		t.Parallel()
+
+		_, schema := newPostgres(t, db, "no_entry")
+
+		stored := getStoredUser(t, db, schema, "nonexistent-user")
+		require.Nil(t, stored)
+	})
+
 	t.Run("Special characters in userID are handled correctly", func(t *testing.T) {
 		t.Parallel()
 		ctx := t.Context()
 
-		db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
-		require.NoError(t, err)
-		schema := "special_chars"
-		p := newPostgres(t, db, schema)
+		p, schema := newPostgres(t, db, "special_chars")
 		userID := "user@example.com"
 
 		user, err := p.RegisterVisit(ctx, userID)
