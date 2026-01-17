@@ -175,6 +175,7 @@ type playtimeDistributionStats struct {
 
 func MakeGetWrappedHandler(
 	getPlayerPITs app.GetPlayerPITs,
+	registerUserVisit app.RegisterUserVisit,
 	allowedOrigins *DomainSuffixes,
 	rootLogger *slog.Logger,
 	sentryMiddleware func(http.HandlerFunc) http.HandlerFunc,
@@ -281,6 +282,19 @@ func MakeGetWrappedHandler(
 			slog.String("normalizedUUID", uuid),
 			slog.Int("parsedYear", year),
 		)
+
+		// Register user visit if userID is present
+		if userID != "" && userID != "<missing>" {
+			_, err := registerUserVisit(ctx, userID)
+			if err != nil {
+				reporting.Report(ctx, fmt.Errorf("failed to register user visit: %w", err))
+				statusCode := http.StatusInternalServerError
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(statusCode)
+				w.Write([]byte(`{"success":false,"cause":"Internal server error"}`))
+				return
+			}
+		}
 
 		// NOTE: 24-hour padding to ensure we can complete sessions at year boundaries
 		playerPITsStart := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC).Add(-24 * time.Hour)

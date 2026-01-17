@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Amund211/flashlight/internal/app"
 	"github.com/Amund211/flashlight/internal/logging"
 	"github.com/Amund211/flashlight/internal/ratelimiting"
 	"github.com/Amund211/flashlight/internal/reporting"
@@ -36,6 +37,7 @@ type userIDType string
 type prismVersionType string
 
 func MakePrismNoticesHandler(
+	registerUserVisit app.RegisterUserVisit,
 	rootLogger *slog.Logger,
 	sentryMiddleware func(http.HandlerFunc) http.HandlerFunc,
 ) http.HandlerFunc {
@@ -101,6 +103,16 @@ func MakePrismNoticesHandler(
 				"prismVersion": prismVersion,
 			},
 		)
+
+		// Register user visit if userID is present
+		if userID != "" && userID != "<missing>" {
+			_, err := registerUserVisit(ctx, userID)
+			if err != nil {
+				reporting.Report(ctx, fmt.Errorf("failed to register user visit: %w", err))
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+		}
 
 		notices, err := noticesForCall(ctx, userIDType(userID), prismVersionType(prismVersion), time.Now())
 		if err != nil {

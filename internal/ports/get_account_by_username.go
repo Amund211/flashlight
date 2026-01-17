@@ -24,6 +24,7 @@ type accountResponse struct {
 
 func MakeGetAccountByUsernameHandler(
 	getAccountByUsername app.GetAccountByUsername,
+	registerUserVisit app.RegisterUserVisit,
 	allowedOrigins *DomainSuffixes,
 	rootLogger *slog.Logger,
 	sentryMiddleware func(http.HandlerFunc) http.HandlerFunc,
@@ -97,6 +98,16 @@ func MakeGetAccountByUsernameHandler(
 				"username": username,
 			},
 		)
+
+		// Register user visit if userID is present
+		if userID != "" && userID != "<missing>" {
+			_, err := registerUserVisit(ctx, userID)
+			if err != nil {
+				reporting.Report(ctx, fmt.Errorf("failed to register user visit: %w", err))
+				handleError(ctx, "internal server error", http.StatusInternalServerError)
+				return
+			}
+		}
 
 		usernameLength := len(username)
 		if usernameLength == 0 || usernameLength > 100 {

@@ -18,6 +18,7 @@ import (
 
 func MakeGetHistoryHandler(
 	getHistory app.GetHistory,
+	registerUserVisit app.RegisterUserVisit,
 	allowedOrigins *DomainSuffixes,
 	rootLogger *slog.Logger,
 	sentryMiddleware func(http.HandlerFunc) http.HandlerFunc,
@@ -118,6 +119,16 @@ func MakeGetHistoryHandler(
 			slog.String("end", request.End.Format(time.RFC3339)),
 			slog.Int("limit", request.Limit),
 		)
+
+		// Register user visit if userID is present
+		if userID != "" && userID != "<missing>" {
+			_, err := registerUserVisit(ctx, userID)
+			if err != nil {
+				reporting.Report(ctx, fmt.Errorf("failed to register user visit: %w", err))
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
+		}
 
 		if request.Start.After(request.End) {
 			reporting.Report(ctx, fmt.Errorf("start time is after end time"))
