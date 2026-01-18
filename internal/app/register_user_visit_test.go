@@ -16,10 +16,10 @@ import (
 type mockUserRepository struct {
 	t *testing.T
 
-	registerVisitUserID       string
-	registerVisitCalled       bool
-	registerVisitReturnUser   domain.User
-	registerVisitReturnError  error
+	registerVisitUserID      string
+	registerVisitCalled      bool
+	registerVisitReturnUser  domain.User
+	registerVisitReturnError error
 }
 
 func (m *mockUserRepository) RegisterVisit(ctx context.Context, userID string) (domain.User, error) {
