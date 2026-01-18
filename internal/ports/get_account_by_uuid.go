@@ -99,11 +99,9 @@ func MakeGetAccountByUUIDHandler(
 			},
 		)
 
-		_, err = registerUserVisit(ctx, userID)
-		if err != nil {
-			handleError(ctx, "internal server error", http.StatusInternalServerError)
-			return
-		}
+		go func() {
+			_, _ = registerUserVisit(ctx, userID)
+		}()
 
 		account, err := getAccountByUUID(ctx, uuid)
 		if errors.Is(err, domain.ErrUsernameNotFound) {

@@ -99,11 +99,9 @@ func MakeGetAccountByUsernameHandler(
 			},
 		)
 
-		_, err := registerUserVisit(ctx, userID)
-		if err != nil {
-			handleError(ctx, "internal server error", http.StatusInternalServerError)
-			return
-		}
+		go func() {
+			_, _ = registerUserVisit(ctx, userID)
+		}()
 
 		usernameLength := len(username)
 		if usernameLength == 0 || usernameLength > 100 {

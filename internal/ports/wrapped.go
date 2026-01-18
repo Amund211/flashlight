@@ -283,14 +283,9 @@ func MakeGetWrappedHandler(
 			slog.Int("parsedYear", year),
 		)
 
-		_, err = registerUserVisit(ctx, userID)
-		if err != nil {
-			statusCode := http.StatusInternalServerError
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(statusCode)
-			w.Write([]byte(`{"success":false,"cause":"Internal server error"}`))
-			return
-		}
+		go func() {
+			_, _ = registerUserVisit(ctx, userID)
+		}()
 
 		// NOTE: 24-hour padding to ensure we can complete sessions at year boundaries
 		playerPITsStart := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC).Add(-24 * time.Hour)

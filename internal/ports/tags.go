@@ -118,11 +118,9 @@ func MakeGetTagsHandler(
 		)
 		ctx = logging.AddMetaToContext(ctx, slog.String("uuid", uuid))
 
-		_, err = registerUserVisit(ctx, userID)
-		if err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
+		go func() {
+			_, _ = registerUserVisit(ctx, userID)
+		}()
 
 		tags, err := getTags(ctx, uuid, urchinAPIKey)
 		if errors.Is(err, domain.ErrTemporarilyUnavailable) {

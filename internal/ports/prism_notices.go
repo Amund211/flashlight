@@ -104,11 +104,9 @@ func MakePrismNoticesHandler(
 			},
 		)
 
-		_, err := registerUserVisit(ctx, userID)
-		if err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
+		go func() {
+			_, _ = registerUserVisit(ctx, userID)
+		}()
 
 		notices, err := noticesForCall(ctx, userIDType(userID), prismVersionType(prismVersion), time.Now())
 		if err != nil {

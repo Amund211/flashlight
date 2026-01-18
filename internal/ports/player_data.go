@@ -107,15 +107,9 @@ func MakeGetPlayerDataHandler(
 			},
 		)
 
-		_, err = registerUserVisit(ctx, userID)
-		if err != nil {
-			statusCode := http.StatusInternalServerError
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(statusCode)
-			w.Write([]byte(`{"success":false,"cause":"Internal server error"}`))
-			logging.FromContext(ctx).InfoContext(ctx, "Returning response", "statusCode", statusCode, "reason", "register user visit failed")
-			return
-		}
+		go func() {
+			_, _ = registerUserVisit(ctx, userID)
+		}()
 
 		player, err := getAndPersistPlayerWithCache(ctx, uuid)
 		if errors.Is(err, domain.ErrPlayerNotFound) {

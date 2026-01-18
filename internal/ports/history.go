@@ -120,11 +120,9 @@ func MakeGetHistoryHandler(
 			slog.Int("limit", request.Limit),
 		)
 
-		_, err = registerUserVisit(ctx, userID)
-		if err != nil {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
+		go func() {
+			_, _ = registerUserVisit(ctx, userID)
+		}()
 
 		if request.Start.After(request.End) {
 			reporting.Report(ctx, fmt.Errorf("start time is after end time"))
