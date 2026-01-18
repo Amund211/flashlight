@@ -99,6 +99,9 @@ func TestPostgresRegisterVisit(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			ctx := t.Context()
 
+			db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
+			require.NoError(t, err)
+
 			p, schema := newPostgres(t, db, "first_visit")
 			userID := "test-user-1"
 
@@ -133,6 +136,9 @@ func TestPostgresRegisterVisit(t *testing.T) {
 		t.Skip("flaky test, needs investigation")
 		synctest.Test(t, func(t *testing.T) {
 			ctx := t.Context()
+
+			db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
+			require.NoError(t, err)
 
 			p, schema := newPostgres(t, db, "second_visit")
 			userID := "test-user-2"
@@ -178,6 +184,9 @@ func TestPostgresRegisterVisit(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {
 			ctx := t.Context()
 
+			db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
+			require.NoError(t, err)
+
 			p, schema := newPostgres(t, db, "multiple_visits")
 			userID := "test-user-3"
 
@@ -215,6 +224,9 @@ func TestPostgresRegisterVisit(t *testing.T) {
 		t.Parallel()
 		synctest.Test(t, func(t *testing.T) {
 			ctx := t.Context()
+
+			db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
+			require.NoError(t, err)
 
 			t0 := time.Now()
 
