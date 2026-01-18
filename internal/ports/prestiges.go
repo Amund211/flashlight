@@ -1,7 +1,6 @@
 package ports
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -76,6 +75,7 @@ func MakeGetPrestigesHandler(
 		BuildCORSMiddleware(allowedOrigins),
 		NewRateLimitMiddleware(ipRateLimiter, makeOnLimitExceeded(ipRateLimiter)),
 		NewRateLimitMiddleware(userIDRateLimiter, makeOnLimitExceeded(userIDRateLimiter)),
+		app.BuildRegisterUserVisitMiddleware(registerUserVisit),
 	)
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -111,14 +111,6 @@ func MakeGetPrestigesHandler(
 			"uuid": uuid,
 		})
 		ctx = logging.AddMetaToContext(ctx, slog.String("normalizedUUID", uuid))
-
-		go func() {
-			// NOTE: Since we're doing this in a goroutine, we want a context that won't get cancelled when the request ends
-			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 1*time.Second)
-			defer cancel()
-
-			_, _ = registerUserVisit(ctx, userID)
-		}()
 
 		// Generate hardcoded milestones: multiples of 100 up to 10,000
 		milestones := make([]int64, 0, 100)

@@ -1,7 +1,6 @@
 package ports
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -62,6 +61,7 @@ func MakeGetSessionsHandler(
 		BuildCORSMiddleware(allowedOrigins),
 		NewRateLimitMiddleware(ipRateLimiter, makeOnLimitExceeded(ipRateLimiter)),
 		NewRateLimitMiddleware(userIDRateLimiter, makeOnLimitExceeded(userIDRateLimiter)),
+		app.BuildRegisterUserVisitMiddleware(registerUserVisit),
 	)
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -115,14 +115,6 @@ func MakeGetSessionsHandler(
 			slog.String("start", request.Start.Format(time.RFC3339)),
 			slog.String("end", request.End.Format(time.RFC3339)),
 		)
-
-		go func() {
-			// NOTE: Since we're doing this in a goroutine, we want a context that won't get cancelled when the request ends
-			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 1*time.Second)
-			defer cancel()
-
-			_, _ = registerUserVisit(ctx, userID)
-		}()
 
 		if request.Start.After(request.End) {
 			reporting.Report(ctx, fmt.Errorf("start time is after end time"))

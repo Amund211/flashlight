@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/Amund211/flashlight/internal/app"
 	"github.com/Amund211/flashlight/internal/domain"
@@ -64,6 +63,7 @@ func MakeGetAccountByUsernameHandler(
 		BuildCORSMiddleware(allowedOrigins),
 		NewRateLimitMiddleware(ipRateLimiter, makeOnLimitExceeded(ipRateLimiter)),
 		NewRateLimitMiddleware(userIDRateLimiter, makeOnLimitExceeded(userIDRateLimiter)),
+		app.BuildRegisterUserVisitMiddleware(registerUserVisit),
 	)
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -99,14 +99,6 @@ func MakeGetAccountByUsernameHandler(
 				"username": username,
 			},
 		)
-
-		go func() {
-			// NOTE: Since we're doing this in a goroutine, we want a context that won't get cancelled when the request ends
-			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 1*time.Second)
-			defer cancel()
-
-			_, _ = registerUserVisit(ctx, userID)
-		}()
 
 		usernameLength := len(username)
 		if usernameLength == 0 || usernameLength > 100 {

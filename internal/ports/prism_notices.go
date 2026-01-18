@@ -78,6 +78,7 @@ func MakePrismNoticesHandler(
 		reporting.NewAddMetaMiddleware("prism-notices"),
 		NewRateLimitMiddleware(ipRateLimiter, makeOnLimitExceeded(ipRateLimiter)),
 		NewRateLimitMiddleware(userIDRateLimiter, makeOnLimitExceeded(userIDRateLimiter)),
+		app.BuildRegisterUserVisitMiddleware(registerUserVisit),
 	)
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -103,14 +104,6 @@ func MakePrismNoticesHandler(
 				"prismVersion": prismVersion,
 			},
 		)
-
-		go func() {
-			// NOTE: Since we're doing this in a goroutine, we want a context that won't get cancelled when the request ends
-			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 1*time.Second)
-			defer cancel()
-
-			_, _ = registerUserVisit(ctx, userID)
-		}()
 
 		notices, err := noticesForCall(ctx, userIDType(userID), prismVersionType(prismVersion), time.Now())
 		if err != nil {
