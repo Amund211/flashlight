@@ -43,6 +43,10 @@ func TestPostgresRegisterVisit(t *testing.T) {
 	db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
 	require.NoError(t, err)
 
+	t.Cleanup(func() {
+		db.Close()
+	})
+
 	getStoredUser := func(t *testing.T, schema string, userID string) *dbUser {
 		t.Helper()
 
@@ -101,6 +105,7 @@ func TestPostgresRegisterVisit(t *testing.T) {
 
 			db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
 			require.NoError(t, err)
+			defer db.Close()
 
 			p, schema := newPostgres(t, db, "first_visit")
 			userID := "test-user-1"
@@ -139,6 +144,7 @@ func TestPostgresRegisterVisit(t *testing.T) {
 
 			db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
 			require.NoError(t, err)
+			defer db.Close()
 
 			p, schema := newPostgres(t, db, "second_visit")
 			userID := "test-user-2"
@@ -186,6 +192,7 @@ func TestPostgresRegisterVisit(t *testing.T) {
 
 			db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
 			require.NoError(t, err)
+			defer db.Close()
 
 			p, schema := newPostgres(t, db, "multiple_visits")
 			userID := "test-user-3"
@@ -227,6 +234,7 @@ func TestPostgresRegisterVisit(t *testing.T) {
 
 			db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
 			require.NoError(t, err)
+			defer db.Close()
 
 			t0 := time.Now()
 
