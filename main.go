@@ -143,7 +143,7 @@ func main() {
 
 	accountRepo := accountrepository.NewPostgres(db, repositorySchemaName)
 
-	userRepo := userrepository.NewPostgres(db, repositorySchemaName)
+	userRepo := userrepository.NewPostgres(db, repositorySchemaName, time.Now)
 	logger.InfoContext(ctx, "Initialized UserRepository")
 
 	allowedOrigins, err := ports.NewDomainSuffixes(PROD_DOMAIN_SUFFIX, STAGING_DOMAIN_SUFFIX)

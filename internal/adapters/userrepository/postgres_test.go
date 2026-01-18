@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"testing"
-	"testing/synctest"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -18,7 +17,7 @@ import (
 	"github.com/Amund211/flashlight/internal/domain"
 )
 
-func newPostgres(t *testing.T, db *sqlx.DB, schemaSuffix string) (*Postgres, string) {
+func newPostgres(t *testing.T, db *sqlx.DB, schemaSuffix string, nowFunc func() time.Time) (*Postgres, string) {
 	require.NotEmpty(t, schemaSuffix, "schemaSuffix must not be empty")
 	schema := fmt.Sprintf("users_repo_test_%s", schemaSuffix)
 
@@ -31,7 +30,7 @@ func newPostgres(t *testing.T, db *sqlx.DB, schemaSuffix string) (*Postgres, str
 	err := migrator.Migrate(t.Context(), schema)
 	require.NoError(t, err)
 
-	return NewPostgres(db, schema), schema
+	return NewPostgres(db, schema, nowFunc), schema
 }
 
 func TestPostgresRegisterVisit(t *testing.T) {
@@ -93,194 +92,199 @@ func TestPostgresRegisterVisit(t *testing.T) {
 
 	t.Run("First visit creates new user", func(t *testing.T) {
 		t.Parallel()
-		synctest.Test(t, func(t *testing.T) {
-			ctx := t.Context()
+		ctx := t.Context()
 
-			db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
-			require.NoError(t, err)
-			defer db.Close()
+		db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
+		require.NoError(t, err)
+		defer db.Close()
 
-			p, schema := newPostgres(t, db, "first_visit")
-			userID := "test-user-1"
+		currentTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+		nowFunc := func() time.Time {
+			return currentTime
+		}
 
-			start := time.Now()
+		p, schema := newPostgres(t, db, "first_visit", nowFunc)
+		userID := "test-user-1"
 
-			user, err := p.RegisterVisit(ctx, userID)
-			require.NoError(t, err)
+		user, err := p.RegisterVisit(ctx, userID)
+		require.NoError(t, err)
 
-			expectedUser := domain.User{
-				UserID:      userID,
-				SeenCount:   1,
-				FirstSeenAt: start,
-				LastSeenAt:  start,
-			}
+		expectedUser := domain.User{
+			UserID:      userID,
+			SeenCount:   1,
+			FirstSeenAt: currentTime,
+			LastSeenAt:  currentTime,
+		}
 
-			requireEqualUsers(t, expectedUser, user)
-			// First seen and last seen should be equal on first visit
-			require.Equal(t, user.FirstSeenAt, user.LastSeenAt)
+		requireEqualUsers(t, expectedUser, user)
+		// First seen and last seen should be equal on first visit
+		require.Equal(t, user.FirstSeenAt, user.LastSeenAt)
 
-			// Verify in database
-			requireStoredUser(t, db, schema, expectedUser)
+		// Verify in database
+		requireStoredUser(t, db, schema, expectedUser)
 
-			// First seen and last seen should be equal on first visit
-			stored := getStoredUser(t, db, schema, userID)
-			require.NotNil(t, stored)
-			require.Equal(t, stored.FirstSeenAt, stored.LastSeenAt)
-		})
+		// First seen and last seen should be equal on first visit
+		stored := getStoredUser(t, db, schema, userID)
+		require.NotNil(t, stored)
+		require.Equal(t, stored.FirstSeenAt, stored.LastSeenAt)
 	})
 
 	t.Run("Second visit updates last_seen_at and increments count", func(t *testing.T) {
 		t.Parallel()
-		t.Skip("flaky test, needs investigation")
-		synctest.Test(t, func(t *testing.T) {
-			ctx := t.Context()
+		ctx := t.Context()
 
-			db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
-			require.NoError(t, err)
-			defer db.Close()
+		db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
+		require.NoError(t, err)
+		defer db.Close()
 
-			p, schema := newPostgres(t, db, "second_visit")
-			userID := "test-user-2"
+		currentTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+		nowFunc := func() time.Time {
+			return currentTime
+		}
 
-			first := time.Now()
+		p, schema := newPostgres(t, db, "second_visit", nowFunc)
+		userID := "test-user-2"
 
-			firstExpected := domain.User{
-				UserID:      userID,
-				SeenCount:   1,
-				FirstSeenAt: first,
-				LastSeenAt:  first,
-			}
+		firstExpected := domain.User{
+			UserID:      userID,
+			SeenCount:   1,
+			FirstSeenAt: currentTime,
+			LastSeenAt:  currentTime,
+		}
 
-			// First visit
-			user1, err := p.RegisterVisit(ctx, userID)
-			require.NoError(t, err)
-			requireEqualUsers(t, firstExpected, user1)
-			requireStoredUser(t, db, schema, firstExpected)
+		// First visit
+		user1, err := p.RegisterVisit(ctx, userID)
+		require.NoError(t, err)
+		requireEqualUsers(t, firstExpected, user1)
+		requireStoredUser(t, db, schema, firstExpected)
 
-			time.Sleep(1 * time.Minute)
-			second := time.Now()
+		// Advance time
+		currentTime = currentTime.Add(1 * time.Minute)
 
-			secondExpected := domain.User{
-				UserID:      userID,
-				SeenCount:   2,
-				FirstSeenAt: first,
-				LastSeenAt:  second,
-			}
+		secondExpected := domain.User{
+			UserID:      userID,
+			SeenCount:   2,
+			FirstSeenAt: firstExpected.FirstSeenAt,
+			LastSeenAt:  currentTime,
+		}
 
-			// Second visit
-			user2, err := p.RegisterVisit(ctx, userID)
-			require.NoError(t, err)
-			requireEqualUsers(t, secondExpected, user2)
-			requireStoredUser(t, db, schema, secondExpected)
+		// Second visit
+		user2, err := p.RegisterVisit(ctx, userID)
+		require.NoError(t, err)
+		requireEqualUsers(t, secondExpected, user2)
+		requireStoredUser(t, db, schema, secondExpected)
 
-			require.Equal(t, user1.FirstSeenAt, user2.FirstSeenAt) // First seen should not change
-		})
+		require.Equal(t, user1.FirstSeenAt, user2.FirstSeenAt) // First seen should not change
 	})
 
 	t.Run("Multiple visits increment count correctly", func(t *testing.T) {
 		t.Parallel()
-		t.Skip("flaky test, needs investigation")
-		synctest.Test(t, func(t *testing.T) {
-			ctx := t.Context()
+		ctx := t.Context()
 
-			db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
-			require.NoError(t, err)
-			defer db.Close()
+		db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
+		require.NoError(t, err)
+		defer db.Close()
 
-			p, schema := newPostgres(t, db, "multiple_visits")
-			userID := "test-user-3"
+		currentTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+		nowFunc := func() time.Time {
+			return currentTime
+		}
 
-			start := time.Now()
+		p, schema := newPostgres(t, db, "multiple_visits", nowFunc)
+		userID := "test-user-3"
 
-			for i := range 5 {
-				now := time.Now()
+		start := currentTime
 
-				expected := domain.User{
-					UserID:      userID,
-					SeenCount:   int64(i + 1),
-					FirstSeenAt: start,
-					LastSeenAt:  now,
-				}
-
-				user, err := p.RegisterVisit(ctx, userID)
-				require.NoError(t, err)
-
-				requireEqualUsers(t, expected, user)
-				requireStoredUser(t, db, schema, expected)
-
-				time.Sleep(1 * time.Hour)
+		for i := range 5 {
+			expected := domain.User{
+				UserID:      userID,
+				SeenCount:   int64(i + 1),
+				FirstSeenAt: start,
+				LastSeenAt:  currentTime,
 			}
 
-			requireStoredUser(t, db, schema, domain.User{
-				UserID:      userID,
-				SeenCount:   5,
-				FirstSeenAt: start,
-				LastSeenAt:  time.Now().Add(-time.Hour),
-			})
+			user, err := p.RegisterVisit(ctx, userID)
+			require.NoError(t, err)
+
+			requireEqualUsers(t, expected, user)
+			requireStoredUser(t, db, schema, expected)
+
+			// Advance time
+			currentTime = currentTime.Add(1 * time.Hour)
+		}
+
+		requireStoredUser(t, db, schema, domain.User{
+			UserID:      userID,
+			SeenCount:   5,
+			FirstSeenAt: start,
+			LastSeenAt:  start.Add(4 * time.Hour),
 		})
 	})
 
 	t.Run("Different users are tracked independently", func(t *testing.T) {
 		t.Parallel()
-		synctest.Test(t, func(t *testing.T) {
-			ctx := t.Context()
+		ctx := t.Context()
 
-			db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
-			require.NoError(t, err)
-			defer db.Close()
+		db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
+		require.NoError(t, err)
+		defer db.Close()
 
-			t0 := time.Now()
+		currentTime := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+		nowFunc := func() time.Time {
+			return currentTime
+		}
 
-			p, schema := newPostgres(t, db, "multiple_users")
-			user1ID := "test-user-4"
-			user2ID := "test-user-5"
+		p, schema := newPostgres(t, db, "multiple_users", nowFunc)
+		user1ID := "test-user-4"
+		user2ID := "test-user-5"
 
-			// User 1 visits twice
-			u1v1, err := p.RegisterVisit(ctx, user1ID)
-			require.NoError(t, err)
-			requireEqualUsers(t, domain.User{
-				UserID:      user1ID,
-				SeenCount:   1,
-				FirstSeenAt: t0,
-				LastSeenAt:  t0,
-			}, u1v1)
+		t0 := currentTime
 
-			time.Sleep(1 * time.Minute)
+		// User 1 visits twice
+		u1v1, err := p.RegisterVisit(ctx, user1ID)
+		require.NoError(t, err)
+		requireEqualUsers(t, domain.User{
+			UserID:      user1ID,
+			SeenCount:   1,
+			FirstSeenAt: t0,
+			LastSeenAt:  t0,
+		}, u1v1)
 
-			t1 := time.Now()
+		// Advance time
+		currentTime = currentTime.Add(1 * time.Minute)
+		t1 := currentTime
 
-			u1v2, err := p.RegisterVisit(ctx, user1ID)
-			require.NoError(t, err)
-			requireEqualUsers(t, domain.User{
-				UserID:      user1ID,
-				SeenCount:   2,
-				FirstSeenAt: t0,
-				LastSeenAt:  t1,
-			}, u1v2)
+		u1v2, err := p.RegisterVisit(ctx, user1ID)
+		require.NoError(t, err)
+		requireEqualUsers(t, domain.User{
+			UserID:      user1ID,
+			SeenCount:   2,
+			FirstSeenAt: t0,
+			LastSeenAt:  t1,
+		}, u1v2)
 
-			// User 2 visits once
-			u2v1, err := p.RegisterVisit(ctx, user2ID)
-			require.NoError(t, err)
-			requireEqualUsers(t, domain.User{
-				UserID:      user2ID,
-				SeenCount:   1,
-				FirstSeenAt: t1,
-				LastSeenAt:  t1,
-			}, u2v1)
+		// User 2 visits once
+		u2v1, err := p.RegisterVisit(ctx, user2ID)
+		require.NoError(t, err)
+		requireEqualUsers(t, domain.User{
+			UserID:      user2ID,
+			SeenCount:   1,
+			FirstSeenAt: t1,
+			LastSeenAt:  t1,
+		}, u2v1)
 
-			// Verify both users in database
-			requireStoredUser(t, db, schema, domain.User{
-				UserID:      user1ID,
-				SeenCount:   2,
-				FirstSeenAt: t0,
-				LastSeenAt:  t1,
-			})
-			requireStoredUser(t, db, schema, domain.User{
-				UserID:      user2ID,
-				SeenCount:   1,
-				FirstSeenAt: t1,
-				LastSeenAt:  t1,
-			})
+		// Verify both users in database
+		requireStoredUser(t, db, schema, domain.User{
+			UserID:      user1ID,
+			SeenCount:   2,
+			FirstSeenAt: t0,
+			LastSeenAt:  t1,
+		})
+		requireStoredUser(t, db, schema, domain.User{
+			UserID:      user2ID,
+			SeenCount:   1,
+			FirstSeenAt: t1,
+			LastSeenAt:  t1,
 		})
 	})
 
@@ -292,7 +296,11 @@ func TestPostgresRegisterVisit(t *testing.T) {
 		require.NoError(t, err)
 		defer db.Close()
 
-		p, _ := newPostgres(t, db, "empty_userid")
+		nowFunc := func() time.Time {
+			return time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+		}
+
+		p, _ := newPostgres(t, db, "empty_userid", nowFunc)
 
 		_, err = p.RegisterVisit(ctx, "")
 		require.Error(t, err)
@@ -306,7 +314,11 @@ func TestPostgresRegisterVisit(t *testing.T) {
 		require.NoError(t, err)
 		defer db.Close()
 
-		_, schema := newPostgres(t, db, "no_entry")
+		nowFunc := func() time.Time {
+			return time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+		}
+
+		_, schema := newPostgres(t, db, "no_entry", nowFunc)
 
 		stored := getStoredUser(t, db, schema, "nonexistent-user")
 		require.Nil(t, stored)
@@ -320,7 +332,11 @@ func TestPostgresRegisterVisit(t *testing.T) {
 		require.NoError(t, err)
 		defer db.Close()
 
-		p, schema := newPostgres(t, db, "special_chars")
+		nowFunc := func() time.Time {
+			return time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+		}
+
+		p, schema := newPostgres(t, db, "special_chars", nowFunc)
 		userID := "user@`-'example.com; DROP TABLE users;--"
 
 		user, err := p.RegisterVisit(ctx, userID)

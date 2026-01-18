@@ -14,17 +14,19 @@ import (
 )
 
 type Postgres struct {
-	db     *sqlx.DB
-	schema string
-	tracer trace.Tracer
+	db      *sqlx.DB
+	schema  string
+	tracer  trace.Tracer
+	nowFunc func() time.Time
 }
 
-func NewPostgres(db *sqlx.DB, schema string) *Postgres {
+func NewPostgres(db *sqlx.DB, schema string, nowFunc func() time.Time) *Postgres {
 	tracer := otel.Tracer("flashlight/userrepository/postgres")
 	return &Postgres{
-		db:     db,
-		schema: schema,
-		tracer: tracer,
+		db:      db,
+		schema:  schema,
+		tracer:  tracer,
+		nowFunc: nowFunc,
 	}
 }
 
@@ -45,7 +47,7 @@ func (p *Postgres) RegisterVisit(ctx context.Context, userID string) (domain.Use
 		return domain.User{}, err
 	}
 
-	now := time.Now()
+	now := p.nowFunc()
 
 	var user dbUser
 	err := p.db.QueryRowxContext(
