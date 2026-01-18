@@ -63,6 +63,15 @@ func buildMetricsMiddleware(handler string) func(http.HandlerFunc) http.HandlerF
 				userID = "<missing>"
 			}
 
+			if len(userID) < 20 {
+				userID = "<short user id>"
+			}
+
+			if userAgent == `insert-bad` ||
+				userAgent == `insert-bad` {
+				userID = "<bad actor user id>"
+			}
+
 			next(w, r)
 
 			attributes := []attribute.KeyValue{
