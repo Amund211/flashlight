@@ -105,6 +105,10 @@ func MakePrismNoticesHandler(
 		)
 
 		go func() {
+			// NOTE: Since we're doing this in a goroutine, we want a context that won't get cancelled when the request ends
+			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 1*time.Second)
+			defer cancel()
+
 			_, _ = registerUserVisit(ctx, userID)
 		}()
 

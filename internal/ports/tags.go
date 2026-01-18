@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/Amund211/flashlight/internal/app"
 	"github.com/Amund211/flashlight/internal/domain"
@@ -119,6 +120,10 @@ func MakeGetTagsHandler(
 		ctx = logging.AddMetaToContext(ctx, slog.String("uuid", uuid))
 
 		go func() {
+			// NOTE: Since we're doing this in a goroutine, we want a context that won't get cancelled when the request ends
+			ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 1*time.Second)
+			defer cancel()
+
 			_, _ = registerUserVisit(ctx, userID)
 		}()
 
