@@ -61,7 +61,7 @@ func (p *Postgres) RegisterVisit(ctx context.Context, userID string) (domain.Use
 			pq.QuoteIdentifier(p.schema)),
 		userID,
 		now,
-	).Scan(&user.UserID, &user.FirstSeenAt, &user.LastSeenAt, &user.SeenCount)
+	).StructScan(&user)
 	if err != nil {
 		err := fmt.Errorf("failed to insert or update user: %w", err)
 		reporting.Report(ctx, err, map[string]string{
@@ -76,19 +76,4 @@ func (p *Postgres) RegisterVisit(ctx context.Context, userID string) (domain.Use
 		LastSeenAt:  user.LastSeenAt,
 		SeenCount:   user.SeenCount,
 	}, nil
-}
-
-type StubUserRepository struct{}
-
-func (s *StubUserRepository) RegisterVisit(ctx context.Context, userID string) (domain.User, error) {
-	return domain.User{
-		UserID:      userID,
-		FirstSeenAt: time.Now(),
-		LastSeenAt:  time.Now(),
-		SeenCount:   1,
-	}, nil
-}
-
-func NewStubUserRepository() *StubUserRepository {
-	return &StubUserRepository{}
 }

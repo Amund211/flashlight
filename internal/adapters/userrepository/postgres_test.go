@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/Amund211/flashlight/internal/adapters/database"
+	"github.com/Amund211/flashlight/internal/domain"
 )
 
 func newPostgres(t *testing.T, db *sqlx.DB, schemaSuffix string) (*Postgres, string) {
@@ -42,7 +43,7 @@ func TestPostgresRegisterVisit(t *testing.T) {
 	db, err := database.NewPostgresDatabase(database.LOCAL_CONNECTION_STRING)
 	require.NoError(t, err)
 
-	getStoredUser := func(t *testing.T, db *sqlx.DB, schema string, userID string) *dbUser {
+	getStoredUser := func(t *testing.T, schema string, userID string) *dbUser {
 		t.Helper()
 
 		ctx := t.Context()
@@ -65,7 +66,32 @@ func TestPostgresRegisterVisit(t *testing.T) {
 		}
 		require.NoError(t, err)
 
+		err = txx.Commit()
+		require.NoError(t, err)
+
 		return &user
+	}
+
+	requireEqualUsers := func(t *testing.T, expected, actual domain.User) {
+		t.Helper()
+		require.Equal(t, expected.UserID, actual.UserID)
+		require.Equal(t, expected.SeenCount, actual.SeenCount)
+
+		// Time can get truncated when round-tripping to the database
+		require.WithinDuration(t, expected.FirstSeenAt, actual.FirstSeenAt, time.Millisecond)
+		require.WithinDuration(t, expected.LastSeenAt, actual.LastSeenAt, time.Millisecond)
+	}
+
+	requireStoredUser := func(t *testing.T, schema string, expected domain.User) {
+		t.Helper()
+		stored := getStoredUser(t, schema, expected.UserID)
+		require.NotNil(t, stored)
+		requireEqualUsers(t, expected, domain.User{
+			UserID:      stored.UserID,
+			SeenCount:   stored.SeenCount,
+			FirstSeenAt: stored.FirstSeenAt,
+			LastSeenAt:  stored.LastSeenAt,
+		})
 	}
 
 	t.Run("First visit creates new user", func(t *testing.T) {
@@ -81,19 +107,23 @@ func TestPostgresRegisterVisit(t *testing.T) {
 			user, err := p.RegisterVisit(ctx, userID)
 			require.NoError(t, err)
 
-			require.Equal(t, userID, user.UserID)
-			require.Equal(t, int64(1), user.SeenCount)
-			require.WithinDuration(t, start, user.FirstSeenAt, time.Millisecond)
-			require.WithinDuration(t, start, user.LastSeenAt, time.Millisecond)
+			expectedUser := domain.User{
+				UserID:      userID,
+				SeenCount:   1,
+				FirstSeenAt: start,
+				LastSeenAt:  start,
+			}
+
+			requireEqualUsers(t, expectedUser, user)
+			// First seen and last seen should be equal on first visit
 			require.Equal(t, user.FirstSeenAt, user.LastSeenAt)
 
 			// Verify in database
-			stored := getStoredUser(t, db, schema, userID)
+			requireStoredUser(t, schema, expectedUser)
+
+			// First seen and last seen should be equal on first visit
+			stored := getStoredUser(t, schema, userID)
 			require.NotNil(t, stored)
-			require.Equal(t, userID, stored.UserID)
-			require.Equal(t, int64(1), stored.SeenCount)
-			require.WithinDuration(t, start, stored.FirstSeenAt, time.Millisecond)
-			require.WithinDuration(t, start, stored.LastSeenAt, time.Millisecond)
 			require.Equal(t, stored.FirstSeenAt, stored.LastSeenAt)
 		})
 	})
@@ -109,32 +139,36 @@ func TestPostgresRegisterVisit(t *testing.T) {
 
 			first := time.Now()
 
+			firstExpected := domain.User{
+				UserID:      userID,
+				SeenCount:   1,
+				FirstSeenAt: first,
+				LastSeenAt:  first,
+			}
+
 			// First visit
 			user1, err := p.RegisterVisit(ctx, userID)
 			require.NoError(t, err)
-			require.Equal(t, int64(1), user1.SeenCount)
-			require.WithinDuration(t, first, user1.FirstSeenAt, time.Millisecond)
-			require.WithinDuration(t, first, user1.LastSeenAt, time.Millisecond)
+			requireEqualUsers(t, firstExpected, user1)
+			requireStoredUser(t, schema, firstExpected)
 
 			time.Sleep(1 * time.Minute)
-
 			second := time.Now()
+
+			secondExpected := domain.User{
+				UserID:      userID,
+				SeenCount:   2,
+				FirstSeenAt: first,
+				LastSeenAt:  second,
+			}
 
 			// Second visit
 			user2, err := p.RegisterVisit(ctx, userID)
 			require.NoError(t, err)
-			require.Equal(t, userID, user2.UserID)
-			require.Equal(t, int64(2), user2.SeenCount)
-			require.Equal(t, user1.FirstSeenAt, user2.FirstSeenAt) // First seen should not change
-			require.WithinDuration(t, second, user2.FirstSeenAt, time.Millisecond)
+			requireEqualUsers(t, secondExpected, user2)
+			requireStoredUser(t, schema, secondExpected)
 
-			// Verify in database
-			stored := getStoredUser(t, db, schema, userID)
-			require.NotNil(t, stored)
-			require.Equal(t, userID, stored.UserID)
-			require.Equal(t, int64(2), stored.SeenCount)
-			require.Equal(t, first, stored.FirstSeenAt)
-			require.WithinDuration(t, second, stored.LastSeenAt, time.Millisecond)
+			require.Equal(t, user1.FirstSeenAt, user2.FirstSeenAt) // First seen should not change
 		})
 	})
 
@@ -151,53 +185,90 @@ func TestPostgresRegisterVisit(t *testing.T) {
 
 			for i := range 5 {
 				now := time.Now()
+
+				expected := domain.User{
+					UserID:      userID,
+					SeenCount:   int64(i + 1),
+					FirstSeenAt: start,
+					LastSeenAt:  now,
+				}
+
 				user, err := p.RegisterVisit(ctx, userID)
 				require.NoError(t, err)
 
-				require.Equal(t, int64(i+1), user.SeenCount)
-				require.WithinDuration(t, start, user.FirstSeenAt, time.Millisecond)
-				require.WithinDuration(t, now, user.LastSeenAt, time.Millisecond)
+				requireEqualUsers(t, expected, user)
+				requireStoredUser(t, schema, expected)
 
 				time.Sleep(1 * time.Hour)
 			}
 
-			// Final verification
-			stored := getStoredUser(t, db, schema, userID)
-			require.NotNil(t, stored)
-			require.Equal(t, int64(5), stored.SeenCount)
+			requireStoredUser(t, schema, domain.User{
+				UserID:      userID,
+				SeenCount:   5,
+				FirstSeenAt: start,
+				LastSeenAt:  time.Now().Add(-time.Hour),
+			})
 		})
 	})
 
 	t.Run("Different users are tracked independently", func(t *testing.T) {
 		t.Parallel()
-		ctx := t.Context()
+		synctest.Test(t, func(t *testing.T) {
+			ctx := t.Context()
 
-		p, schema := newPostgres(t, db, "multiple_users")
-		user1ID := "test-user-4"
-		user2ID := "test-user-5"
+			t0 := time.Now()
 
-		// User 1 visits twice
-		u1v1, err := p.RegisterVisit(ctx, user1ID)
-		require.NoError(t, err)
-		require.Equal(t, int64(1), u1v1.SeenCount)
+			p, schema := newPostgres(t, db, "multiple_users")
+			user1ID := "test-user-4"
+			user2ID := "test-user-5"
 
-		u1v2, err := p.RegisterVisit(ctx, user1ID)
-		require.NoError(t, err)
-		require.Equal(t, int64(2), u1v2.SeenCount)
+			// User 1 visits twice
+			u1v1, err := p.RegisterVisit(ctx, user1ID)
+			require.NoError(t, err)
+			requireEqualUsers(t, domain.User{
+				UserID:      user1ID,
+				SeenCount:   1,
+				FirstSeenAt: t0,
+				LastSeenAt:  t0,
+			}, u1v1)
 
-		// User 2 visits once
-		u2v1, err := p.RegisterVisit(ctx, user2ID)
-		require.NoError(t, err)
-		require.Equal(t, int64(1), u2v1.SeenCount)
+			time.Sleep(1 * time.Minute)
 
-		// Verify both users in database
-		stored1 := getStoredUser(t, db, schema, user1ID)
-		require.NotNil(t, stored1)
-		require.Equal(t, int64(2), stored1.SeenCount)
+			t1 := time.Now()
 
-		stored2 := getStoredUser(t, db, schema, user2ID)
-		require.NotNil(t, stored2)
-		require.Equal(t, int64(1), stored2.SeenCount)
+			u1v2, err := p.RegisterVisit(ctx, user1ID)
+			require.NoError(t, err)
+			requireEqualUsers(t, domain.User{
+				UserID:      user1ID,
+				SeenCount:   2,
+				FirstSeenAt: t0,
+				LastSeenAt:  t1,
+			}, u1v2)
+
+			// User 2 visits once
+			u2v1, err := p.RegisterVisit(ctx, user2ID)
+			require.NoError(t, err)
+			requireEqualUsers(t, domain.User{
+				UserID:      user2ID,
+				SeenCount:   1,
+				FirstSeenAt: t1,
+				LastSeenAt:  t1,
+			}, u2v1)
+
+			// Verify both users in database
+			requireStoredUser(t, schema, domain.User{
+				UserID:      user1ID,
+				SeenCount:   2,
+				FirstSeenAt: t0,
+				LastSeenAt:  t1,
+			})
+			requireStoredUser(t, schema, domain.User{
+				UserID:      user2ID,
+				SeenCount:   1,
+				FirstSeenAt: t1,
+				LastSeenAt:  t1,
+			})
+		})
 	})
 
 	t.Run("Empty userID returns error", func(t *testing.T) {
@@ -216,7 +287,7 @@ func TestPostgresRegisterVisit(t *testing.T) {
 
 		_, schema := newPostgres(t, db, "no_entry")
 
-		stored := getStoredUser(t, db, schema, "nonexistent-user")
+		stored := getStoredUser(t, schema, "nonexistent-user")
 		require.Nil(t, stored)
 	})
 
@@ -225,14 +296,14 @@ func TestPostgresRegisterVisit(t *testing.T) {
 		ctx := t.Context()
 
 		p, schema := newPostgres(t, db, "special_chars")
-		userID := "user@example.com"
+		userID := "user@`-'example.com; DROP TABLE users;--"
 
 		user, err := p.RegisterVisit(ctx, userID)
 		require.NoError(t, err)
 		require.Equal(t, userID, user.UserID)
 		require.Equal(t, int64(1), user.SeenCount)
 
-		stored := getStoredUser(t, db, schema, userID)
+		stored := getStoredUser(t, schema, userID)
 		require.NotNil(t, stored)
 		require.Equal(t, userID, stored.UserID)
 	})
