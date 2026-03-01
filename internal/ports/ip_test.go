@@ -1,7 +1,6 @@
 package ports_test
 
 import (
-	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
 	"testing"
@@ -9,12 +8,6 @@ import (
 	"github.com/Amund211/flashlight/internal/ports"
 	"github.com/stretchr/testify/require"
 )
-
-// hashIP is a helper that takes an IP string and returns the SHA256 hash encoded as a hex string
-func hashIP(ip string) string {
-	hash := sha256.Sum256([]byte(ip))
-	return hex.EncodeToString(hash[:])
-}
 
 func TestGetIP(t *testing.T) {
 	t.Parallel()
@@ -176,8 +169,8 @@ func TestGetIPHash(t *testing.T) {
 				req.Header.Add("X-Forwarded-For", c.xForwardedFor)
 			}
 
-			// Sanity check that expectedHash matches hashIP(expectedIP)
-			require.Equal(t, c.expectedHash, hashIP(c.expectedIP))
+			// Sanity check that expectedHash matches ports.HashIP(expectedIP)
+			require.Equal(t, c.expectedHash, ports.HashIP(c.expectedIP))
 
 			hash := ports.GetIPHash(req)
 

@@ -65,6 +65,12 @@ type BlocklistConfig struct {
 }
 
 func BuildBlocklistMiddleware(config BlocklistConfig) func(http.HandlerFunc) http.HandlerFunc {
+	// Pre-hash the IPs from the config so we can compare them with the hashed IP from the request
+	hashedIPs := make([]string, len(config.IPs))
+	for i, ip := range config.IPs {
+		hashedIPs[i] = HashIP(ip)
+	}
+	
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -72,7 +78,7 @@ func BuildBlocklistMiddleware(config BlocklistConfig) func(http.HandlerFunc) htt
 			userAgent := r.UserAgent()
 			userID := GetUserID(r)
 
-			badIP := slices.Contains(config.IPs, ipHash)
+			badIP := slices.Contains(hashedIPs, ipHash)
 			badUserAgent := slices.Contains(config.UserAgents, userAgent)
 			badUserID := slices.Contains(config.UserIDs, userID)
 

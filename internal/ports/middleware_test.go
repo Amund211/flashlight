@@ -2,8 +2,6 @@ package ports
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -15,12 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// hashIP is a helper that takes an IP string and returns the SHA256 hash encoded as a hex string
-func hashIP(ip string) string {
-	hash := sha256.Sum256([]byte(ip))
-	return hex.EncodeToString(hash[:])
-}
 
 type mockedRateLimiter struct {
 	t           *testing.T
@@ -44,7 +36,7 @@ func TestRateLimitMiddleware(t *testing.T) {
 		rateLimiter := &mockedRateLimiter{
 			t:           t,
 			allow:       allow,
-			expectedKey: fmt.Sprintf("ip: %s", hashIP("12.12.123.123")),
+			expectedKey: fmt.Sprintf("ip: %s", HashIP("12.12.123.123")),
 		}
 		ipRateLimiter := ratelimiting.NewRequestBasedRateLimiter(
 			rateLimiter, IPHashKeyFunc,
@@ -292,10 +284,10 @@ func TestBuildBlocklistMiddleware(t *testing.T) {
 			name: "blocking different ips,uas,users",
 			config: BlocklistConfig{
 				IPs: []string{
-					hashIP("1.2.2.2"),
-					hashIP("2.2.2.2"),
-					hashIP("3.2.2.2"),
-					hashIP("4.2.2.2"),
+					"1.2.2.2",
+					"2.2.2.2",
+					"3.2.2.2",
+					"4.2.2.2",
 				},
 				UserAgents: []string{
 					"BadBot/1.0",
@@ -315,10 +307,10 @@ func TestBuildBlocklistMiddleware(t *testing.T) {
 			name: "blocked by ip",
 			config: BlocklistConfig{
 				IPs: []string{
-					hashIP("1.2.2.2"),
-					hashIP("2.2.2.2"),
-					hashIP("3.2.2.2"),
-					hashIP("4.2.2.2"),
+					"1.2.2.2",
+					"2.2.2.2",
+					"3.2.2.2",
+					"4.2.2.2",
 				},
 				UserAgents: []string{
 					"BadBot/1.0",
@@ -338,10 +330,10 @@ func TestBuildBlocklistMiddleware(t *testing.T) {
 			name: "blocked by user agent",
 			config: BlocklistConfig{
 				IPs: []string{
-					hashIP("1.2.2.2"),
-					hashIP("2.2.2.2"),
-					hashIP("3.2.2.2"),
-					hashIP("4.2.2.2"),
+					"1.2.2.2",
+					"2.2.2.2",
+					"3.2.2.2",
+					"4.2.2.2",
 				},
 				UserAgents: []string{
 					"BadBot/1.0",
@@ -361,10 +353,10 @@ func TestBuildBlocklistMiddleware(t *testing.T) {
 			name: "blocked by user ID",
 			config: BlocklistConfig{
 				IPs: []string{
-					hashIP("1.2.2.2"),
-					hashIP("2.2.2.2"),
-					hashIP("3.2.2.2"),
-					hashIP("4.2.2.2"),
+					"1.2.2.2",
+					"2.2.2.2",
+					"3.2.2.2",
+					"4.2.2.2",
 				},
 				UserAgents: []string{
 					"BadBot/1.0",

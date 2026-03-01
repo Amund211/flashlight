@@ -100,8 +100,13 @@ func GetIP(r *http.Request) string {
 	return parsed.String()
 }
 
-func GetIPHash(r *http.Request) string {
-	ip := GetIP(r)
+// HashIP takes an IP string and returns the SHA256 hash encoded as a hex string
+func HashIP(ip string) string {
 	hash := sha256.Sum256([]byte(ip))
 	return hex.EncodeToString(hash[:])
+}
+
+func GetIPHash(r *http.Request) string {
+	ip := GetIP(r)
+	return HashIP(ip)
 }
