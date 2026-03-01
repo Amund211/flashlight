@@ -266,7 +266,8 @@ func TestBuildBlocklistMiddleware(t *testing.T) {
 
 	// Helper to compute IP hash for test data
 	hashIP := func(ip string) string {
-		req, _ := http.NewRequest("GET", "/", nil)
+		req, err := http.NewRequest("GET", "/", nil)
+		require.NoError(t, err)
 		req.Header.Set("X-Forwarded-For", fmt.Sprintf("%s,34.111.7.239", ip))
 		return GetIPHash(req)
 	}
