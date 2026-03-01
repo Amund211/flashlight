@@ -33,12 +33,12 @@ func NewRateLimitMiddleware(rateLimiter ratelimiting.RequestRateLimiter, onLimit
 					userAgent = "<missing>"
 				}
 				userID := GetUserID(r)
-				ip := GetIP(r)
+				ipHash := GetIPHash(r)
 
 				attributes := []attribute.KeyValue{
 					attribute.String("user_agent", userAgent),
 					attribute.String("user_id", userID),
-					attribute.String("ip", ip),
+					attribute.String("ip_hash", ipHash),
 				}
 				metrics.ratelimitedRequestCount.Add(ctx, 1, metric.WithAttributes(attributes...))
 
