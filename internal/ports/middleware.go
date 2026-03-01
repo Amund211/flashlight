@@ -89,9 +89,9 @@ func BuildBlocklistMiddleware(config BlocklistConfig, logger *slog.Logger) func(
 				}
 				requestLogger.InfoContext(ctx, "Blocked request",
 					slog.String("ip", ip),
-					slog.String("userAgent", userAgent),
-					slog.String("userID", userID),
-					slog.String("blockReason", blockReason),
+					slog.String("user_agent", userAgent),
+					slog.String("user_id", userID),
+					slog.String("block_reason", blockReason),
 				)
 
 				// Record metric with block reason (not including high-cardinality labels)
