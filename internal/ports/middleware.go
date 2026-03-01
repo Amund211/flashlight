@@ -80,11 +80,11 @@ func BuildBlocklistMiddleware(config BlocklistConfig) func(http.HandlerFunc) htt
 				// Log the blocked request with details
 				logging.FromContext(ctx).InfoContext(ctx, "Blocked request",
 					slog.String("ip", ip),
-					slog.String("user_agent", userAgent),
-					slog.String("user_id", userID),
-					slog.Bool("bad_ip", badIP),
-					slog.Bool("bad_user_agent", badUserAgent),
-					slog.Bool("bad_user_id", badUserID),
+					slog.String("userAgent", userAgent),
+					slog.String("userId", userID),
+					slog.Bool("badIp", badIP),
+					slog.Bool("badUserAgent", badUserAgent),
+					slog.Bool("badUserId", badUserID),
 				)
 
 				// Record metric with blocking dimensions as labels
