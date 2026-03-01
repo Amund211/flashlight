@@ -27,6 +27,21 @@ func NewRateLimitMiddleware(rateLimiter ratelimiting.RequestRateLimiter, onLimit
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			if !rateLimiter.Consume(r) {
+				ctx := r.Context()
+				userAgent := r.UserAgent()
+				if userAgent == "" {
+					userAgent = "<missing>"
+				}
+				userID := GetUserID(r)
+				ip := GetIP(r)
+
+				attributes := []attribute.KeyValue{
+					attribute.String("user_agent", userAgent),
+					attribute.String("user_id", userID),
+					attribute.String("ip", ip),
+				}
+				metrics.ratelimitedRequestCount.Add(ctx, 1, metric.WithAttributes(attributes...))
+
 				onLimitExceeded(w, r)
 				return
 			}
