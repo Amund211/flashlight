@@ -1,6 +1,8 @@
 package ports
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"net/http"
@@ -96,4 +98,10 @@ func GetIP(r *http.Request) string {
 	}
 
 	return parsed.String()
+}
+
+func GetIPHash(r *http.Request) string {
+	ip := GetIP(r)
+	hash := sha256.Sum256([]byte(ip))
+	return hex.EncodeToString(hash[:])
 }
