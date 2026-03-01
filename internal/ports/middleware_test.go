@@ -2,6 +2,8 @@ package ports
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +15,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// hashIP is a helper that takes an IP string and returns the SHA256 hash encoded as a hex string
+func hashIP(ip string) string {
+	hash := sha256.Sum256([]byte(ip))
+	return hex.EncodeToString(hash[:])
+}
 
 type mockedRateLimiter struct {
 	t           *testing.T
@@ -28,14 +36,6 @@ func (m *mockedRateLimiter) Consume(key string) bool {
 
 func TestRateLimitMiddleware(t *testing.T) {
 	t.Parallel()
-
-	// Helper to compute IP hash for test data
-	hashIP := func(ip string) string {
-		req, err := http.NewRequest("GET", "/", nil)
-		require.NoError(t, err)
-		req.Header.Set("X-Forwarded-For", fmt.Sprintf("%s,34.111.7.239", ip))
-		return GetIPHash(req)
-	}
 
 	runTest := func(t *testing.T, allow bool) {
 		t.Helper()
@@ -270,14 +270,6 @@ func TestBuildBlocklistMiddleware(t *testing.T) {
 			called = true
 			w.WriteHeader(http.StatusOK)
 		}, &called
-	}
-
-	// Helper to compute IP hash for test data
-	hashIP := func(ip string) string {
-		req, err := http.NewRequest("GET", "/", nil)
-		require.NoError(t, err)
-		req.Header.Set("X-Forwarded-For", fmt.Sprintf("%s,34.111.7.239", ip))
-		return GetIPHash(req)
 	}
 
 	cases := []struct {
