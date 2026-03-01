@@ -55,10 +55,10 @@ func MakeGetHistoryHandler(
 	}
 
 	middleware := ComposeMiddlewares(
-		BuildBlocklistMiddleware(blocklistConfig, rootLogger),
 		buildMetricsMiddleware("history"),
 		logging.NewRequestLoggerMiddleware(rootLogger),
 		sentryMiddleware,
+		BuildBlocklistMiddleware(blocklistConfig),
 		reporting.NewAddMetaMiddleware("history"),
 		BuildCORSMiddleware(allowedOrigins),
 		NewRateLimitMiddleware(ipRateLimiter, makeOnLimitExceeded(ipRateLimiter)),

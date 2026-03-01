@@ -64,7 +64,7 @@ type BlocklistConfig struct {
 	UserIDs    []string
 }
 
-func BuildBlocklistMiddleware(config BlocklistConfig, logger *slog.Logger) func(http.HandlerFunc) http.HandlerFunc {
+func BuildBlocklistMiddleware(config BlocklistConfig) func(http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -72,31 +72,26 @@ func BuildBlocklistMiddleware(config BlocklistConfig, logger *slog.Logger) func(
 			userAgent := r.UserAgent()
 			userID := GetUserID(r)
 
-			var blockReason string
-			if slices.Contains(config.IPs, ip) {
-				blockReason = "ip"
-			} else if slices.Contains(config.UserAgents, userAgent) {
-				blockReason = "user_agent"
-			} else if slices.Contains(config.UserIDs, userID) {
-				blockReason = "user_id"
-			}
+			badIP := slices.Contains(config.IPs, ip)
+			badUserAgent := slices.Contains(config.UserAgents, userAgent)
+			badUserID := slices.Contains(config.UserIDs, userID)
 
-			if blockReason != "" {
+			if badIP || badUserAgent || badUserID {
 				// Log the blocked request with details
-				requestLogger := logger
-				if ctxLogger := logging.FromContext(ctx); ctxLogger != nil {
-					requestLogger = ctxLogger
-				}
-				requestLogger.InfoContext(ctx, "Blocked request",
+				logging.FromContext(ctx).InfoContext(ctx, "Blocked request",
 					slog.String("ip", ip),
 					slog.String("user_agent", userAgent),
 					slog.String("user_id", userID),
-					slog.String("block_reason", blockReason),
+					slog.Bool("bad_ip", badIP),
+					slog.Bool("bad_user_agent", badUserAgent),
+					slog.Bool("bad_user_id", badUserID),
 				)
 
-				// Record metric with block reason (not including high-cardinality labels)
+				// Record metric with blocking dimensions as labels
 				attributes := []attribute.KeyValue{
-					attribute.String("block_reason", blockReason),
+					attribute.Bool("bad_ip", badIP),
+					attribute.Bool("bad_user_agent", badUserAgent),
+					attribute.Bool("bad_user_id", badUserID),
 				}
 				metrics.blockedRequestCount.Add(ctx, 1, metric.WithAttributes(attributes...))
 

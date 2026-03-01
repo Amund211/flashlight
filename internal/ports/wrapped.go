@@ -208,10 +208,10 @@ func MakeGetWrappedHandler(
 	}
 
 	middleware := ComposeMiddlewares(
-		BuildBlocklistMiddleware(blocklistConfig, rootLogger),
 		buildMetricsMiddleware("wrapped"),
 		logging.NewRequestLoggerMiddleware(rootLogger),
 		sentryMiddleware,
+		BuildBlocklistMiddleware(blocklistConfig),
 		reporting.NewAddMetaMiddleware("wrapped"),
 		BuildCORSMiddleware(allowedOrigins),
 		NewRateLimitMiddleware(ipRateLimiter, makeOnLimitExceeded(ipRateLimiter)),

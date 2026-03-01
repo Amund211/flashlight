@@ -55,10 +55,10 @@ func MakeGetSessionsHandler(
 	}
 
 	middleware := ComposeMiddlewares(
-		BuildBlocklistMiddleware(blocklistConfig, rootLogger),
 		buildMetricsMiddleware("sessions"),
 		logging.NewRequestLoggerMiddleware(rootLogger),
 		sentryMiddleware,
+		BuildBlocklistMiddleware(blocklistConfig),
 		reporting.NewAddMetaMiddleware("sessions"),
 		BuildCORSMiddleware(allowedOrigins),
 		NewRateLimitMiddleware(ipRateLimiter, makeOnLimitExceeded(ipRateLimiter)),

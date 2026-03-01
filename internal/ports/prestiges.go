@@ -69,10 +69,10 @@ func MakeGetPrestigesHandler(
 	}
 
 	middleware := ComposeMiddlewares(
-		BuildBlocklistMiddleware(blocklistConfig, rootLogger),
 		buildMetricsMiddleware("prestiges"),
 		logging.NewRequestLoggerMiddleware(rootLogger),
 		sentryMiddleware,
+		BuildBlocklistMiddleware(blocklistConfig),
 		reporting.NewAddMetaMiddleware("prestiges"),
 		BuildCORSMiddleware(allowedOrigins),
 		NewRateLimitMiddleware(ipRateLimiter, makeOnLimitExceeded(ipRateLimiter)),
