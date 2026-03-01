@@ -11,8 +11,8 @@ import (
 )
 
 type portsMetricsCollection struct {
-	requestCount       metric.Int64Counter
-	requestDuration    metric.Float64Histogram
+	requestCount        metric.Int64Counter
+	requestDuration     metric.Float64Histogram
 	blockedRequestCount metric.Int64Counter
 }
 
