@@ -208,7 +208,7 @@ func MakeGetWrappedHandler(
 	}
 
 	middleware := ComposeMiddlewares(
-		BuildBlocklistMiddleware(blocklistConfig),
+		BuildBlocklistMiddleware(blocklistConfig, rootLogger),
 		buildMetricsMiddleware("wrapped"),
 		logging.NewRequestLoggerMiddleware(rootLogger),
 		sentryMiddleware,

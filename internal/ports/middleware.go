@@ -3,12 +3,16 @@ package ports
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"slices"
 	"time"
 
 	"github.com/Amund211/flashlight/internal/app"
+	"github.com/Amund211/flashlight/internal/logging"
 	"github.com/Amund211/flashlight/internal/ratelimiting"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 )
 
 func IPKeyFunc(r *http.Request) string {
@@ -60,12 +64,42 @@ type BlocklistConfig struct {
 	UserIDs    []string
 }
 
-func BuildBlocklistMiddleware(config BlocklistConfig) func(http.HandlerFunc) http.HandlerFunc {
+func BuildBlocklistMiddleware(config BlocklistConfig, logger *slog.Logger) func(http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			if slices.Contains(config.IPs, GetIP(r)) ||
-				slices.Contains(config.UserAgents, r.UserAgent()) ||
-				slices.Contains(config.UserIDs, GetUserID(r)) {
+			ctx := r.Context()
+			ip := GetIP(r)
+			userAgent := r.UserAgent()
+			userID := GetUserID(r)
+
+			var blockReason string
+			if slices.Contains(config.IPs, ip) {
+				blockReason = "ip"
+			} else if slices.Contains(config.UserAgents, userAgent) {
+				blockReason = "user_agent"
+			} else if slices.Contains(config.UserIDs, userID) {
+				blockReason = "user_id"
+			}
+
+			if blockReason != "" {
+				// Log the blocked request with details
+				requestLogger := logger
+				if ctxLogger := logging.FromContext(ctx); ctxLogger != nil {
+					requestLogger = ctxLogger
+				}
+				requestLogger.InfoContext(ctx, "Blocked request",
+					slog.String("ip", ip),
+					slog.String("userAgent", userAgent),
+					slog.String("userID", userID),
+					slog.String("blockReason", blockReason),
+				)
+
+				// Record metric with block reason (not including high-cardinality labels)
+				attributes := []attribute.KeyValue{
+					attribute.String("block_reason", blockReason),
+				}
+				metrics.blockedRequestCount.Add(ctx, 1, metric.WithAttributes(attributes...))
+
 				http.Error(w, `{"success": false, "detail": "This API does not allow third-party use. Reach out on the Prism discord if you have questions :^) (https://discord.gg/k4FGUnEHYg)"}`, http.StatusBadRequest)
 				return
 			}

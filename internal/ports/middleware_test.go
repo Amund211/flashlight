@@ -3,8 +3,10 @@ package ports
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"sync"
 	"testing"
 
@@ -377,7 +379,8 @@ func TestBuildBlocklistMiddleware(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			middleware := BuildBlocklistMiddleware(tc.config)
+			logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+			middleware := BuildBlocklistMiddleware(tc.config, logger)
 
 			inner, innerCalled := makeHandler()
 

@@ -74,7 +74,7 @@ func MakePrismNoticesHandler(
 	}
 
 	middleware := ComposeMiddlewares(
-		BuildBlocklistMiddleware(blocklistConfig),
+		BuildBlocklistMiddleware(blocklistConfig, rootLogger),
 		buildMetricsMiddleware("prism-notices"),
 		logging.NewRequestLoggerMiddleware(rootLogger),
 		sentryMiddleware,

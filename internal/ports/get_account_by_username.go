@@ -57,7 +57,7 @@ func MakeGetAccountByUsernameHandler(
 	}
 
 	middleware := ComposeMiddlewares(
-		BuildBlocklistMiddleware(blocklistConfig),
+		BuildBlocklistMiddleware(blocklistConfig, rootLogger),
 		buildMetricsMiddleware("get_account_by_username"),
 		logging.NewRequestLoggerMiddleware(rootLogger),
 		sentryMiddleware,

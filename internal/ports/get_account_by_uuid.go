@@ -50,7 +50,7 @@ func MakeGetAccountByUUIDHandler(
 	}
 
 	middleware := ComposeMiddlewares(
-		BuildBlocklistMiddleware(blocklistConfig),
+		BuildBlocklistMiddleware(blocklistConfig, rootLogger),
 		buildMetricsMiddleware("get_account_by_uuid"),
 		logging.NewRequestLoggerMiddleware(rootLogger),
 		sentryMiddleware,

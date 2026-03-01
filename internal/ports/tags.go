@@ -70,7 +70,7 @@ func MakeGetTagsHandler(
 	}
 
 	middleware := ComposeMiddlewares(
-		BuildBlocklistMiddleware(blocklistConfig),
+		BuildBlocklistMiddleware(blocklistConfig, rootLogger),
 		buildMetricsMiddleware("tags"),
 		logging.NewRequestLoggerMiddleware(rootLogger),
 		sentryMiddleware,
