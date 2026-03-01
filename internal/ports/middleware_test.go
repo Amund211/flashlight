@@ -264,6 +264,13 @@ func TestBuildBlocklistMiddleware(t *testing.T) {
 		}, &called
 	}
 
+	// Helper to compute IP hash for test data
+	hashIP := func(ip string) string {
+		req, _ := http.NewRequest("GET", "/", nil)
+		req.Header.Set("X-Forwarded-For", fmt.Sprintf("%s,34.111.7.239", ip))
+		return GetIPHash(req)
+	}
+
 	cases := []struct {
 		name      string
 		config    BlocklistConfig
@@ -284,10 +291,10 @@ func TestBuildBlocklistMiddleware(t *testing.T) {
 			name: "blocking different ips,uas,users",
 			config: BlocklistConfig{
 				IPs: []string{
-					"898c03ee944ab3da67850b769fb1c098a5e81701affe8325dd243395b4b319b2", // 1.2.2.2
-					"1e95611092391cacc5ad3adeeb93ed4d881d291e09b7954fd9e7886517739d7b", // 2.2.2.2
-					"625eb85ede80b34456d5c59da6dc0922b138511eec22f9e86bfbde2fec80b426", // 3.2.2.2
-					"8abcb4e5b3b4c7ae2251ed1e18b5675550915036407699d435a56e2226b0e22f", // 4.2.2.2
+					hashIP("1.2.2.2"),
+					hashIP("2.2.2.2"),
+					hashIP("3.2.2.2"),
+					hashIP("4.2.2.2"),
 				},
 				UserAgents: []string{
 					"BadBot/1.0",
@@ -307,10 +314,10 @@ func TestBuildBlocklistMiddleware(t *testing.T) {
 			name: "blocked by ip",
 			config: BlocklistConfig{
 				IPs: []string{
-					"898c03ee944ab3da67850b769fb1c098a5e81701affe8325dd243395b4b319b2", // 1.2.2.2
-					"1e95611092391cacc5ad3adeeb93ed4d881d291e09b7954fd9e7886517739d7b", // 2.2.2.2
-					"625eb85ede80b34456d5c59da6dc0922b138511eec22f9e86bfbde2fec80b426", // 3.2.2.2
-					"8abcb4e5b3b4c7ae2251ed1e18b5675550915036407699d435a56e2226b0e22f", // 4.2.2.2
+					hashIP("1.2.2.2"),
+					hashIP("2.2.2.2"),
+					hashIP("3.2.2.2"),
+					hashIP("4.2.2.2"),
 				},
 				UserAgents: []string{
 					"BadBot/1.0",
@@ -330,10 +337,10 @@ func TestBuildBlocklistMiddleware(t *testing.T) {
 			name: "blocked by user agent",
 			config: BlocklistConfig{
 				IPs: []string{
-					"898c03ee944ab3da67850b769fb1c098a5e81701affe8325dd243395b4b319b2", // 1.2.2.2
-					"1e95611092391cacc5ad3adeeb93ed4d881d291e09b7954fd9e7886517739d7b", // 2.2.2.2
-					"625eb85ede80b34456d5c59da6dc0922b138511eec22f9e86bfbde2fec80b426", // 3.2.2.2
-					"8abcb4e5b3b4c7ae2251ed1e18b5675550915036407699d435a56e2226b0e22f", // 4.2.2.2
+					hashIP("1.2.2.2"),
+					hashIP("2.2.2.2"),
+					hashIP("3.2.2.2"),
+					hashIP("4.2.2.2"),
 				},
 				UserAgents: []string{
 					"BadBot/1.0",
@@ -353,10 +360,10 @@ func TestBuildBlocklistMiddleware(t *testing.T) {
 			name: "blocked by user ID",
 			config: BlocklistConfig{
 				IPs: []string{
-					"898c03ee944ab3da67850b769fb1c098a5e81701affe8325dd243395b4b319b2", // 1.2.2.2
-					"1e95611092391cacc5ad3adeeb93ed4d881d291e09b7954fd9e7886517739d7b", // 2.2.2.2
-					"625eb85ede80b34456d5c59da6dc0922b138511eec22f9e86bfbde2fec80b426", // 3.2.2.2
-					"8abcb4e5b3b4c7ae2251ed1e18b5675550915036407699d435a56e2226b0e22f", // 4.2.2.2
+					hashIP("1.2.2.2"),
+					hashIP("2.2.2.2"),
+					hashIP("3.2.2.2"),
+					hashIP("4.2.2.2"),
 				},
 				UserAgents: []string{
 					"BadBot/1.0",
