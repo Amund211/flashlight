@@ -70,7 +70,7 @@ func BuildBlocklistMiddleware(config BlocklistConfig) func(http.HandlerFunc) htt
 	for i, ip := range config.IPs {
 		hashedIPs[i] = HashIP(ip)
 	}
-	
+
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
