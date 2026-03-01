@@ -125,31 +125,32 @@ func TestGetIPHash(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
+		name          string
 		remoteAddr    string
 		xForwardedFor string
 	}{
 		{
-			// Valid IP through GCP load balancer
+			name:          "valid IP through GCP load balancer",
 			remoteAddr:    "169.254.169.126:58418",
 			xForwardedFor: "12.12.123.123,34.111.7.239",
 		},
 		{
-			// Valid IPv6 address
+			name:          "valid IPv6 address",
 			remoteAddr:    "169.254.169.126:10910",
 			xForwardedFor: "1111:111:1111:1111:1111:1111:1111:1111",
 		},
 		{
-			// Missing X-Forwarded-For header
+			name:       "missing X-Forwarded-For header",
 			remoteAddr: "123.123.123.123",
 		},
 		{
-			// Invalid client IP
+			name:          "invalid client IP",
 			xForwardedFor: "invalid-ip",
 		},
 	}
 
 	for _, c := range cases {
-		t.Run(c.xForwardedFor, func(t *testing.T) {
+		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
 			req, err := http.NewRequest("GET", "/", nil)

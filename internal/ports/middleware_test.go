@@ -29,6 +29,14 @@ func (m *mockedRateLimiter) Consume(key string) bool {
 func TestRateLimitMiddleware(t *testing.T) {
 	t.Parallel()
 
+	// Helper to compute IP hash for test data
+	hashIP := func(ip string) string {
+		req, err := http.NewRequest("GET", "/", nil)
+		require.NoError(t, err)
+		req.Header.Set("X-Forwarded-For", fmt.Sprintf("%s,34.111.7.239", ip))
+		return GetIPHash(req)
+	}
+
 	runTest := func(t *testing.T, allow bool) {
 		t.Helper()
 		handlerCalled := false
@@ -36,7 +44,7 @@ func TestRateLimitMiddleware(t *testing.T) {
 		rateLimiter := &mockedRateLimiter{
 			t:           t,
 			allow:       allow,
-			expectedKey: "ip: d41e06ebd38060ce31e76914ca59460fe105a24afcb8d95e23f55ae96a1b975b",
+			expectedKey: fmt.Sprintf("ip: %s", hashIP("12.12.123.123")),
 		}
 		ipRateLimiter := ratelimiting.NewRequestBasedRateLimiter(
 			rateLimiter, IPHashKeyFunc,
