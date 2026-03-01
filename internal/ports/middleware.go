@@ -35,9 +35,13 @@ func NewRateLimitMiddleware(rateLimiter ratelimiting.RequestRateLimiter, onLimit
 				userID := GetUserID(r)
 				ipHash := GetIPHash(r)
 
+				logging.FromContext(ctx).InfoContext(ctx, "Rate limit exceeded",
+					slog.String("ipHash", ipHash),
+					slog.String("userAgent", userAgent),
+					slog.String("userId", userID),
+				)
+
 				attributes := []attribute.KeyValue{
-					attribute.String("user_agent", userAgent),
-					attribute.String("user_id", userID),
 					attribute.String("ip_hash", ipHash),
 				}
 				metrics.ratelimitedRequestCount.Add(ctx, 1, metric.WithAttributes(attributes...))
