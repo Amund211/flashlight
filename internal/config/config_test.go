@@ -116,60 +116,34 @@ func TestGetConfig(t *testing.T) {
 		}
 
 		cases := []struct {
+			name         string
 			envValue     string
 			expectedList []string
 		}{
 			{
+				name:         "empty value",
 				envValue:     "",
 				expectedList: []string{},
 			},
 			{
+				name:         "single value",
 				envValue:     "singlevalue",
 				expectedList: []string{"singlevalue"},
 			},
 			{
+				name: "multiple values",
 				envValue: `value1
 value2
 value3`,
 				expectedList: []string{"value1", "value2", "value3"},
 			},
 			{
+				name: "multiple values with spaces",
 				envValue: `value1
  value2 
  value3 `,
 				expectedList: []string{"value1", "value2", "value3"},
 			},
-		}
-
-		for _, c := range cases {
-			t.Run(c.envValue, func(t *testing.T) {
-				t.Setenv("FLASHLIGHT_ENVIRONMENT", string(production))
-				t.Setenv("BLOCKED_IPS", c.envValue)
-				t.Setenv("BLOCKED_USER_AGENTS", c.envValue)
-				t.Setenv("BLOCKED_USER_IDS", c.envValue)
-				t.Setenv("BLOCKED_IPS_SHA256_HEX", c.envValue)
-
-				conf, err := config.ConfigFromEnv()
-				require.NoError(t, err)
-				require.Equal(t, c.expectedList, conf.BlockedIPs())
-				require.Equal(t, c.expectedList, conf.BlockedUserAgents())
-				require.Equal(t, c.expectedList, conf.BlockedUserIDs())
-				require.Equal(t, c.expectedList, conf.BlockedIPsSHA256Hex())
-			})
-		}
-	})
-
-	t.Run("inline comments are supported in blocked lists", func(t *testing.T) {
-		// Set all variables
-		for _, variable := range allVariablesExceptEnv {
-			t.Setenv(variable, "placeholder_value")
-		}
-
-		cases := []struct {
-			name         string
-			envValue     string
-			expectedList []string
-		}{
 			{
 				name:         "value with comment and space before hash",
 				envValue:     "value1 # this is a comment",
