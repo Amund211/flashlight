@@ -381,7 +381,7 @@ func TestBuildBlocklistMiddleware(t *testing.T) {
 		{
 			name: "blocked by pre-hashed IP",
 			config: BlocklistConfig{
-				PreHashedIPs: []string{
+				SHA256HexIPs: []string{
 					HashIP("5.5.5.5"),
 					HashIP("6.6.6.6"),
 				},
@@ -394,7 +394,7 @@ func TestBuildBlocklistMiddleware(t *testing.T) {
 		{
 			name: "not blocked when pre-hashed IP doesn't match",
 			config: BlocklistConfig{
-				PreHashedIPs: []string{
+				SHA256HexIPs: []string{
 					HashIP("5.5.5.5"),
 					HashIP("6.6.6.6"),
 				},

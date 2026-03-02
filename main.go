@@ -66,7 +66,7 @@ func main() {
 		IPs:          config.BlockedIPs(),
 		UserAgents:   config.BlockedUserAgents(),
 		UserIDs:      config.BlockedUserIDs(),
-		PreHashedIPs: config.BlockedIPsSHA256Hex(),
+		SHA256HexIPs: config.BlockedIPsSHA256Hex(),
 	}
 
 	otelShutdown, err := telemetry.SetupOTelSDK(ctx, serviceName)
