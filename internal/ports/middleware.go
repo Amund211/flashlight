@@ -103,10 +103,10 @@ func BuildRegisterUserVisitMiddleware(registerUserVisit app.RegisterUserVisit) f
 }
 
 type BlocklistConfig struct {
-	IPs           []string
-	UserAgents    []string
-	UserIDs       []string
-	SHA256HexIPs  []string
+	IPs          []string
+	UserAgents   []string
+	UserIDs      []string
+	SHA256HexIPs []string
 }
 
 func BuildBlocklistMiddleware(config BlocklistConfig) func(http.HandlerFunc) http.HandlerFunc {
