@@ -79,6 +79,11 @@ func buildMetricsMiddleware(handler string) func(http.HandlerFunc) http.HandlerF
 
 			// NOTE: Potentially high cardinality label
 			userID := GetUserID(r)
+			// Hash user IDs shorter than 20 characters to reduce cardinality
+			// (likely usernames or custom IDs rather than UUIDs)
+			if len(userID) < 20 {
+				userID = HashUserID(userID)
+			}
 
 			next(w, r)
 
