@@ -15,7 +15,7 @@ func (u UserID) String() string {
 
 // LowCardinalityString returns a low cardinality representation of the user ID.
 // For IDs shorter than 20 characters, it returns "<short-user-id>".
-// Otherwise, it returns the full user ID.
+// Otherwise, it returns the full user ID (which is truncated to a maximum of 50 characters).
 func (u UserID) LowCardinalityString() string {
 	if len(u) < 20 {
 		return "<short-user-id>"
