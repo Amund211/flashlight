@@ -10,6 +10,12 @@ import (
 	"go.opentelemetry.io/otel/metric"
 )
 
+// minUUIDLength is the minimum length threshold for user IDs to be considered UUIDs.
+// Minecraft UUIDs are 32 characters (without dashes) or 36 characters (with dashes).
+// User IDs shorter than 20 characters are likely custom IDs or usernames,
+// which should be hashed to reduce cardinality in metrics.
+const minUUIDLength = 20
+
 type portsMetricsCollection struct {
 	requestCount            metric.Int64Counter
 	requestDuration         metric.Float64Histogram
@@ -79,9 +85,9 @@ func buildMetricsMiddleware(handler string) func(http.HandlerFunc) http.HandlerF
 
 			// NOTE: Potentially high cardinality label
 			userID := GetUserID(r)
-			// Hash user IDs shorter than 20 characters to reduce cardinality
+			// Hash user IDs shorter than minUUIDLength to reduce cardinality
 			// (likely usernames or custom IDs rather than UUIDs)
-			if len(userID) < 20 {
+			if len(userID) < minUUIDLength {
 				userID = HashUserID(userID)
 			}
 

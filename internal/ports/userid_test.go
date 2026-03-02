@@ -55,7 +55,7 @@ func TestHashUserID(t *testing.T) {
 		{
 			name:   "short user id",
 			userID: "my-id",
-			hash:   "d3e4d37d67c9e8be22bf9e15c8e7f9cfb71c7fb3b0d2e8c0b1f5e8c1a3e4d37d",
+			hash:   "915430721245ebba50e3e6f3e5749d62b0c1ec762ff3adfa0002c0e854371c58",
 		},
 		{
 			name:   "empty string",
@@ -65,7 +65,7 @@ func TestHashUserID(t *testing.T) {
 		{
 			name:   "missing placeholder",
 			userID: "<missing>",
-			hash:   "36c4203f4e09bcf146c97f6e4e9c03e2d5d3f74c8a9a3b5e5f0e2e3e4e5e6e7e",
+			hash:   "769b8995b8bf4407c89e906d67601a46266d34922a63ab1754440eecb0657aab",
 		},
 	}
 
@@ -76,6 +76,8 @@ func TestHashUserID(t *testing.T) {
 			result := ports.HashUserID(c.userID)
 			// Verify it's a valid SHA256 hash (64 hex characters)
 			require.Len(t, result, 64)
+			// Verify it matches the expected hash
+			require.Equal(t, c.hash, result)
 			// Verify it's deterministic
 			require.Equal(t, result, ports.HashUserID(c.userID))
 		})
