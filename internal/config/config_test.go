@@ -158,4 +158,90 @@ value3`,
 			})
 		}
 	})
+
+	t.Run("inline comments are supported in blocked lists", func(t *testing.T) {
+		// Set all variables
+		for _, variable := range allVariablesExceptEnv {
+			t.Setenv(variable, "placeholder_value")
+		}
+
+		cases := []struct {
+			name         string
+			envValue     string
+			expectedList []string
+		}{
+			{
+				name:         "value with comment and space before hash",
+				envValue:     "value1 # this is a comment",
+				expectedList: []string{"value1"},
+			},
+			{
+				name:         "value with comment and no space before hash",
+				envValue:     "value1# this is a comment",
+				expectedList: []string{"value1"},
+			},
+			{
+				name:         "value with leading and trailing spaces and comment",
+				envValue:     "  value1   # comment",
+				expectedList: []string{"value1"},
+			},
+			{
+				name:         "multiple values with comments",
+				envValue:     "value1 # comment1\nvalue2# comment2\nvalue3 #comment3",
+				expectedList: []string{"value1", "value2", "value3"},
+			},
+			{
+				name:         "multiple hashes in line - only first is comment",
+				envValue:     "value1 # comment # with # more # hashes",
+				expectedList: []string{"value1"},
+			},
+			{
+				name:         "line with only comment",
+				envValue:     "# this is just a comment",
+				expectedList: []string{""},
+			},
+			{
+				name:         "mixed lines with and without comments",
+				envValue:     "value1\nvalue2 # with comment\nvalue3",
+				expectedList: []string{"value1", "value2", "value3"},
+			},
+			{
+				name:         "value with hash but no space before it",
+				envValue:     "value#nocomment",
+				expectedList: []string{"value"},
+			},
+			{
+				name:         "empty line and line with comment",
+				envValue:     "\n# comment\nvalue1",
+				expectedList: []string{"", "", "value1"},
+			},
+			{
+				name: "complex real-world example",
+				envValue: `192.168.1.1 # suspicious IP
+192.168.1.2# another one
+192.168.1.3
+  192.168.1.4  # IP with spaces
+# 192.168.1.5 commented out IP
+192.168.1.6 # comment with # multiple # hashes`,
+				expectedList: []string{"192.168.1.1", "192.168.1.2", "192.168.1.3", "192.168.1.4", "", "192.168.1.6"},
+			},
+		}
+
+		for _, c := range cases {
+			t.Run(c.name, func(t *testing.T) {
+				t.Setenv("FLASHLIGHT_ENVIRONMENT", string(production))
+				t.Setenv("BLOCKED_IPS", c.envValue)
+				t.Setenv("BLOCKED_USER_AGENTS", c.envValue)
+				t.Setenv("BLOCKED_USER_IDS", c.envValue)
+				t.Setenv("BLOCKED_IPS_SHA256_HEX", c.envValue)
+
+				conf, err := config.ConfigFromEnv()
+				require.NoError(t, err)
+				require.Equal(t, c.expectedList, conf.BlockedIPs())
+				require.Equal(t, c.expectedList, conf.BlockedUserAgents())
+				require.Equal(t, c.expectedList, conf.BlockedUserIDs())
+				require.Equal(t, c.expectedList, conf.BlockedIPsSHA256Hex())
+			})
+		}
+	})
 }
