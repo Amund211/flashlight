@@ -10,5 +10,10 @@ func GetUserID(r *http.Request) string {
 	if userID == "" {
 		return "<missing>"
 	}
+
+	if len(userID) < 20 {
+		return "<short-user-id>"
+	}
+
 	return fmt.Sprintf("%.50s", userID)
 }
