@@ -205,7 +205,7 @@ func TestBuildRegisterUserVisitMiddleware(t *testing.T) {
 		require.Equal(t, "test-user-123", registeredUserID)
 	})
 
-	t.Run("registerUserVisit gets called with <missing> when no user ID header", func(t *testing.T) {
+	t.Run("registerUserVisit gets called with <missing-user-id> when no user ID header", func(t *testing.T) {
 		t.Parallel()
 
 		var wg sync.WaitGroup
@@ -228,10 +228,10 @@ func TestBuildRegisterUserVisitMiddleware(t *testing.T) {
 		handler(w, req)
 
 		wg.Wait()
-		require.Equal(t, "<missing>", registeredUserID)
+		require.Equal(t, "<missing-user-id>", registeredUserID)
 	})
 
-	t.Run("registerUserVisit gets called with <missing> when user ID header is empty string", func(t *testing.T) {
+	t.Run("registerUserVisit gets called with <missing-user-id> when user ID header is empty string", func(t *testing.T) {
 		t.Parallel()
 
 		var wg sync.WaitGroup
@@ -255,7 +255,7 @@ func TestBuildRegisterUserVisitMiddleware(t *testing.T) {
 		handler(w, req)
 
 		wg.Wait()
-		require.Equal(t, "<missing>", registeredUserID)
+		require.Equal(t, "<missing-user-id>", registeredUserID)
 	})
 }
 
