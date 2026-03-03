@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	missingUserID = "<missing-user-id>"
+	missingUserID = "<missing>"
 	shortUserID   = "<short-user-id>"
 )
 
@@ -14,7 +14,7 @@ const (
 type UserID string
 
 // String returns the full user ID string.
-// Returns "<missing-user-id>" for empty user IDs.
+// Returns "<missing>" for empty user IDs.
 func (u UserID) String() string {
 	if len(u) == 0 {
 		return missingUserID
@@ -23,7 +23,7 @@ func (u UserID) String() string {
 }
 
 // LowCardinalityString returns a low cardinality representation of the user ID.
-// Returns "<missing-user-id>" for empty user IDs.
+// Returns "<missing>" for empty user IDs.
 // For IDs shorter than 20 characters, it returns "<short-user-id>".
 // Otherwise, it returns the full user ID (which is truncated to a maximum of 50 characters).
 func (u UserID) LowCardinalityString() string {

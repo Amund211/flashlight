@@ -22,7 +22,7 @@ func TestGetUserID(t *testing.T) {
 		// Custom user id
 		{uidHeader: "my-id", userID: "my-id"},
 		// Weird case
-		{uidHeader: "", userID: "<missing-user-id>"},
+		{uidHeader: "", userID: "<missing>"},
 		// User controlled input -> Long strings get truncated
 		{uidHeader: strings.Repeat("1", 1000), userID: strings.Repeat("1", 50)},
 	}
@@ -40,7 +40,7 @@ func TestGetUserID(t *testing.T) {
 		t.Parallel()
 
 		request := &http.Request{}
-		require.Equal(t, "<missing-user-id>", ports.GetUserID(request).String())
+		require.Equal(t, "<missing>", ports.GetUserID(request).String())
 	})
 }
 
@@ -57,7 +57,7 @@ func TestUserIDLowCardinalityString(t *testing.T) {
 		{name: "uuid-with-dashes", uidHeader: "1025ff88-5234-4481-900b-f64ea190cf4e", expectedLowCardinality: "1025ff88-5234-4481-900b-f64ea190cf4e"},
 		// Short custom user ids (< 20 chars) - should return <short-user-id>
 		{name: "short-id", uidHeader: "my-id", expectedLowCardinality: "<short-user-id>"},
-		{name: "missing", uidHeader: "", expectedLowCardinality: "<missing-user-id>"},
+		{name: "missing", uidHeader: "", expectedLowCardinality: "<missing>"},
 		{name: "exactly-19-chars", uidHeader: strings.Repeat("1", 19), expectedLowCardinality: "<short-user-id>"},
 		// Exactly 20 chars - should return full ID
 		{name: "exactly-20-chars", uidHeader: strings.Repeat("1", 20), expectedLowCardinality: strings.Repeat("1", 20)},
