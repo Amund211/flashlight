@@ -93,7 +93,7 @@ func BuildRegisterUserVisitMiddleware(registerUserVisit app.RegisterUserVisit) f
 
 				userID := GetUserID(r)
 
-				_, _ = registerUserVisit(ctx, userID.String())
+				_, _ = registerUserVisit(ctx, userID.LowCardinalityString())
 			}()
 
 			next(w, r)
