@@ -11,7 +11,6 @@ type reportingMetaContextKey struct{}
 type ReportingMeta struct {
 	tags      map[string]string
 	extras    map[string]string
-	userID    string
 	startedAt time.Time
 }
 
@@ -21,14 +20,12 @@ func MetaFromContext(ctx context.Context) ReportingMeta {
 		return ReportingMeta{
 			tags:      make(map[string]string),
 			extras:    make(map[string]string),
-			userID:    "",
 			startedAt: time.Time{},
 		}
 	}
 	return ReportingMeta{
 		tags:      maps.Clone(meta.tags),
 		extras:    maps.Clone(meta.extras),
-		userID:    meta.userID,
 		startedAt: meta.startedAt,
 	}
 }
@@ -60,13 +57,6 @@ func AddTagsToContext(ctx context.Context, tags map[string]string) context.Conte
 	for key, value := range tags {
 		meta.tags[key] = value
 	}
-
-	return addMetaToContext(ctx, meta)
-}
-
-func SetUserIDInContext(ctx context.Context, userID string) context.Context {
-	meta := MetaFromContext(ctx)
-	meta.userID = userID
 
 	return addMetaToContext(ctx, meta)
 }

@@ -46,11 +46,6 @@ func Report(ctx context.Context, err error, extras ...map[string]string) {
 		for key, value := range meta.extras {
 			scope.SetExtra(key, value)
 		}
-		if meta.userID != "" {
-			scope.SetUser(sentry.User{
-				ID: meta.userID,
-			})
-		}
 		scope.SetExtra("secondsSinceStart", time.Since(meta.startedAt).Seconds())
 
 		for _, extra := range extras {
