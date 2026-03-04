@@ -34,9 +34,9 @@ type dbUser struct {
 	UserID        string    `db:"user_id"`
 	FirstSeenAt   time.Time `db:"first_seen_at"`
 	LastSeenAt    time.Time `db:"last_seen_at"`
-	SeenCount     int64     `db:"seen_count"`
 	LastIPHash    string    `db:"last_ip_hash"`
 	LastUserAgent string    `db:"last_user_agent"`
+	SeenCount     int64     `db:"seen_count"`
 }
 
 func (p *Postgres) RegisterVisit(ctx context.Context, userID string, ipHash string, userAgent string) (domain.User, error) {
@@ -55,15 +55,15 @@ func (p *Postgres) RegisterVisit(ctx context.Context, userID string, ipHash stri
 	err := p.db.QueryRowxContext(
 		ctx,
 		fmt.Sprintf(`INSERT INTO %s.users
-		(user_id, first_seen_at, last_seen_at, seen_count, last_ip_hash, last_user_agent)
-		VALUES ($1, $2, $2, 1, $3, $4)
+		(user_id, first_seen_at, last_seen_at, last_ip_hash, last_user_agent, seen_count)
+		VALUES ($1, $2, $2, $3, $4, 1)
 		ON CONFLICT (user_id)
 		DO UPDATE SET
 			last_seen_at = EXCLUDED.last_seen_at,
-			seen_count = users.seen_count + 1,
 			last_ip_hash = EXCLUDED.last_ip_hash,
-			last_user_agent = EXCLUDED.last_user_agent
-		RETURNING user_id, first_seen_at, last_seen_at, seen_count, last_ip_hash, last_user_agent`,
+			last_user_agent = EXCLUDED.last_user_agent,
+			seen_count = users.seen_count + 1
+		RETURNING user_id, first_seen_at, last_seen_at, last_ip_hash, last_user_agent, seen_count`,
 			pq.QuoteIdentifier(p.schema)),
 		userID,
 		now,
@@ -82,8 +82,8 @@ func (p *Postgres) RegisterVisit(ctx context.Context, userID string, ipHash stri
 		UserID:        user.UserID,
 		FirstSeenAt:   user.FirstSeenAt,
 		LastSeenAt:    user.LastSeenAt,
-		SeenCount:     user.SeenCount,
 		LastIPHash:    user.LastIPHash,
 		LastUserAgent: user.LastUserAgent,
+		SeenCount:     user.SeenCount,
 	}, nil
 }

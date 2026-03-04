@@ -54,9 +54,9 @@ func TestPostgresRegisterVisit(t *testing.T) {
 		var user dbUser
 		err = txx.QueryRowxContext(
 			ctx,
-			"SELECT user_id, first_seen_at, last_seen_at, seen_count, last_ip_hash, last_user_agent FROM users WHERE user_id = $1",
+			"SELECT user_id, first_seen_at, last_seen_at, last_ip_hash, last_user_agent, seen_count FROM users WHERE user_id = $1",
 			userID,
-		).Scan(&user.UserID, &user.FirstSeenAt, &user.LastSeenAt, &user.SeenCount, &user.LastIPHash, &user.LastUserAgent)
+		).Scan(&user.UserID, &user.FirstSeenAt, &user.LastSeenAt, &user.LastIPHash, &user.LastUserAgent, &user.SeenCount)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}
