@@ -115,7 +115,7 @@ func TestGetIP(t *testing.T) {
 			if c.xForwardedFor != "" {
 				req.Header.Add("X-Forwarded-For", c.xForwardedFor)
 			}
-			require.Equal(t, c.ip, ports.GetIP(req))
+			require.Equal(t, c.ip, ports.GetIP(req).String())
 		})
 	}
 }
@@ -169,8 +169,8 @@ func TestGetIPHash(t *testing.T) {
 				req.Header.Add("X-Forwarded-For", c.xForwardedFor)
 			}
 
-			// Sanity check that expectedHash matches ports.HashIP(expectedIP)
-			require.Equal(t, c.expectedHash, ports.HashIP(c.expectedIP))
+			// Sanity check that expectedHash matches ports.IP(expectedIP).Hash()
+			require.Equal(t, c.expectedHash, ports.IP(c.expectedIP).Hash())
 
 			hash := ports.GetIPHash(req)
 
@@ -181,7 +181,7 @@ func TestGetIPHash(t *testing.T) {
 
 			// Verify hash is consistent with the IP
 			ip := ports.GetIP(req)
-			require.Equal(t, c.expectedIP, ip)
+			require.Equal(t, c.expectedIP, ip.String())
 			require.Equal(t, c.expectedHash, hash)
 		})
 	}

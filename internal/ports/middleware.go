@@ -119,7 +119,7 @@ func BuildBlocklistMiddleware(config BlocklistConfig) func(http.HandlerFunc) htt
 	// Pre-hash the IPs from the config so we can compare them with the hashed IP from the request
 	hashedIPs := make([]string, len(config.IPs)+len(config.SHA256HexIPs))
 	for i, ip := range config.IPs {
-		hashedIPs[i] = HashIP(ip)
+		hashedIPs[i] = IP(ip).Hash()
 	}
 	// Add the pre-hashed IPs to the same list
 	copy(hashedIPs[len(config.IPs):], config.SHA256HexIPs)

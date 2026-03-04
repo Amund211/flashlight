@@ -15,7 +15,18 @@ import (
 // Hard coded IP of the flashlight load balancer in GCP
 const gcpLoadBalancerIP = "34.111.7.239"
 
-func GetIP(r *http.Request) string {
+type IP string
+
+func (ip IP) String() string {
+	return string(ip)
+}
+
+func (ip IP) Hash() string {
+	hash := sha256.Sum256([]byte(ip))
+	return hex.EncodeToString(hash[:])
+}
+
+func GetIP(r *http.Request) IP {
 	ctx := r.Context()
 
 	xff := r.Header.Get("X-Forwarded-For")
@@ -97,16 +108,9 @@ func GetIP(r *http.Request) string {
 		return "<invalid>"
 	}
 
-	return parsed.String()
-}
-
-// HashIP takes an IP string and returns the SHA256 hash encoded as a hex string
-func HashIP(ip string) string {
-	hash := sha256.Sum256([]byte(ip))
-	return hex.EncodeToString(hash[:])
+	return IP(parsed.String())
 }
 
 func GetIPHash(r *http.Request) string {
-	ip := GetIP(r)
-	return HashIP(ip)
+	return GetIP(r).Hash()
 }
