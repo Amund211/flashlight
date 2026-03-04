@@ -1,1 +1,3 @@
-ALTER TABLE users ADD COLUMN IF NOT EXISTS last_ip_hash TEXT NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN last_ip_hash TEXT;
+UPDATE users SET last_ip_hash = '';
+ALTER TABLE users ALTER COLUMN last_ip_hash SET NOT NULL;

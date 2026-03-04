@@ -98,8 +98,9 @@ func BuildRegisterUserVisitMiddleware(registerUserVisit app.RegisterUserVisit) f
 
 				userID := GetUserID(r)
 				ipHash := GetIPHash(r)
+				userAgent := r.UserAgent()
 
-				_, _ = registerUserVisit(ctx, userID.LowCardinalityString(), ipHash)
+				_, _ = registerUserVisit(ctx, userID.LowCardinalityString(), ipHash, userAgent)
 			}()
 
 			next(w, r)
