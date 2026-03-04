@@ -9,4 +9,5 @@ type User struct {
 	FirstSeenAt time.Time
 	LastSeenAt  time.Time
 	SeenCount   int64
+	LastIPHash  string
 }

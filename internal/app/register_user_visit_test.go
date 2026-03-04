@@ -14,14 +14,16 @@ type mockUserRepository struct {
 	t *testing.T
 
 	registerVisitUserID      string
+	registerVisitIPHash      string
 	registerVisitCalled      bool
 	registerVisitReturnUser  domain.User
 	registerVisitReturnError error
 }
 
-func (m *mockUserRepository) RegisterVisit(ctx context.Context, userID string) (domain.User, error) {
+func (m *mockUserRepository) RegisterVisit(ctx context.Context, userID string, ipHash string) (domain.User, error) {
 	m.t.Helper()
 	require.Equal(m.t, m.registerVisitUserID, userID)
+	require.Equal(m.t, m.registerVisitIPHash, ipHash)
 
 	require.False(m.t, m.registerVisitCalled)
 
@@ -43,18 +45,20 @@ func TestBuildRegisterUserVisit(t *testing.T) {
 			FirstSeenAt: now,
 			LastSeenAt:  now,
 			SeenCount:   1,
+			LastIPHash:  "test-ip-hash",
 		}
 
 		repo := &mockUserRepository{
 			t:                        t,
 			registerVisitUserID:      "test-user-123",
+			registerVisitIPHash:      "test-ip-hash",
 			registerVisitReturnUser:  expectedUser,
 			registerVisitReturnError: nil,
 		}
 
 		registerUserVisit := BuildRegisterUserVisit(repo)
 
-		user, err := registerUserVisit(ctx, "test-user-123")
+		user, err := registerUserVisit(ctx, "test-user-123", "test-ip-hash")
 		require.NoError(t, err)
 		require.Equal(t, expectedUser, user)
 		require.True(t, repo.registerVisitCalled)
@@ -66,13 +70,14 @@ func TestBuildRegisterUserVisit(t *testing.T) {
 		repo := &mockUserRepository{
 			t:                        t,
 			registerVisitUserID:      "test-user-456",
+			registerVisitIPHash:      "test-ip-hash-456",
 			registerVisitReturnUser:  domain.User{},
 			registerVisitReturnError: assert.AnError,
 		}
 
 		registerUserVisit := BuildRegisterUserVisit(repo)
 
-		user, err := registerUserVisit(ctx, "test-user-456")
+		user, err := registerUserVisit(ctx, "test-user-456", "test-ip-hash-456")
 		require.Error(t, err)
 		require.ErrorIs(t, err, assert.AnError)
 		require.Equal(t, domain.User{}, user)

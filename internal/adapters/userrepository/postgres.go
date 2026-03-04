@@ -35,9 +35,10 @@ type dbUser struct {
 	FirstSeenAt time.Time `db:"first_seen_at"`
 	LastSeenAt  time.Time `db:"last_seen_at"`
 	SeenCount   int64     `db:"seen_count"`
+	LastIPHash  string    `db:"last_ip_hash"`
 }
 
-func (p *Postgres) RegisterVisit(ctx context.Context, userID string) (domain.User, error) {
+func (p *Postgres) RegisterVisit(ctx context.Context, userID string, ipHash string) (domain.User, error) {
 	ctx, span := p.tracer.Start(ctx, "Postgres.RegisterVisit")
 	defer span.End()
 
@@ -53,16 +54,18 @@ func (p *Postgres) RegisterVisit(ctx context.Context, userID string) (domain.Use
 	err := p.db.QueryRowxContext(
 		ctx,
 		fmt.Sprintf(`INSERT INTO %s.users
-		(user_id, first_seen_at, last_seen_at, seen_count)
-		VALUES ($1, $2, $2, 1)
+		(user_id, first_seen_at, last_seen_at, seen_count, last_ip_hash)
+		VALUES ($1, $2, $2, 1, $3)
 		ON CONFLICT (user_id)
 		DO UPDATE SET
 			last_seen_at = EXCLUDED.last_seen_at,
-			seen_count = users.seen_count + 1
-		RETURNING user_id, first_seen_at, last_seen_at, seen_count`,
+			seen_count = users.seen_count + 1,
+			last_ip_hash = EXCLUDED.last_ip_hash
+		RETURNING user_id, first_seen_at, last_seen_at, seen_count, last_ip_hash`,
 			pq.QuoteIdentifier(p.schema)),
 		userID,
 		now,
+		ipHash,
 	).StructScan(&user)
 	if err != nil {
 		err := fmt.Errorf("failed to insert or update user: %w", err)
@@ -77,5 +80,6 @@ func (p *Postgres) RegisterVisit(ctx context.Context, userID string) (domain.Use
 		FirstSeenAt: user.FirstSeenAt,
 		LastSeenAt:  user.LastSeenAt,
 		SeenCount:   user.SeenCount,
+		LastIPHash:  user.LastIPHash,
 	}, nil
 }

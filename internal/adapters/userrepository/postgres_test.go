@@ -54,9 +54,9 @@ func TestPostgresRegisterVisit(t *testing.T) {
 		var user dbUser
 		err = txx.QueryRowxContext(
 			ctx,
-			"SELECT user_id, first_seen_at, last_seen_at, seen_count FROM users WHERE user_id = $1",
+			"SELECT user_id, first_seen_at, last_seen_at, seen_count, last_ip_hash FROM users WHERE user_id = $1",
 			userID,
-		).Scan(&user.UserID, &user.FirstSeenAt, &user.LastSeenAt, &user.SeenCount)
+		).Scan(&user.UserID, &user.FirstSeenAt, &user.LastSeenAt, &user.SeenCount, &user.LastIPHash)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}
@@ -72,6 +72,7 @@ func TestPostgresRegisterVisit(t *testing.T) {
 		t.Helper()
 		require.Equal(t, expected.UserID, actual.UserID)
 		require.Equal(t, expected.SeenCount, actual.SeenCount)
+		require.Equal(t, expected.LastIPHash, actual.LastIPHash)
 
 		// Time can get truncated when round-tripping to the database
 		require.WithinDuration(t, expected.FirstSeenAt, actual.FirstSeenAt, time.Millisecond)
@@ -87,6 +88,7 @@ func TestPostgresRegisterVisit(t *testing.T) {
 			SeenCount:   stored.SeenCount,
 			FirstSeenAt: stored.FirstSeenAt,
 			LastSeenAt:  stored.LastSeenAt,
+			LastIPHash:  stored.LastIPHash,
 		})
 	}
 
@@ -105,8 +107,9 @@ func TestPostgresRegisterVisit(t *testing.T) {
 
 		p, schema := newPostgres(t, db, "first_visit", nowFunc)
 		userID := "test-user-1"
+		ipHash := "test-ip-hash-1"
 
-		user, err := p.RegisterVisit(ctx, userID)
+		user, err := p.RegisterVisit(ctx, userID, ipHash)
 		require.NoError(t, err)
 
 		expectedUser := domain.User{
@@ -114,6 +117,7 @@ func TestPostgresRegisterVisit(t *testing.T) {
 			SeenCount:   1,
 			FirstSeenAt: currentTime,
 			LastSeenAt:  currentTime,
+			LastIPHash:  ipHash,
 		}
 
 		requireEqualUsers(t, expectedUser, user)
@@ -150,10 +154,11 @@ func TestPostgresRegisterVisit(t *testing.T) {
 			SeenCount:   1,
 			FirstSeenAt: currentTime,
 			LastSeenAt:  currentTime,
+			LastIPHash:  "test-ip-hash-first",
 		}
 
 		// First visit
-		user1, err := p.RegisterVisit(ctx, userID)
+		user1, err := p.RegisterVisit(ctx, userID, "test-ip-hash-first")
 		require.NoError(t, err)
 		requireEqualUsers(t, firstExpected, user1)
 		requireStoredUser(t, db, schema, firstExpected)
@@ -166,10 +171,11 @@ func TestPostgresRegisterVisit(t *testing.T) {
 			SeenCount:   2,
 			FirstSeenAt: firstExpected.FirstSeenAt,
 			LastSeenAt:  currentTime,
+			LastIPHash:  "test-ip-hash-second",
 		}
 
 		// Second visit
-		user2, err := p.RegisterVisit(ctx, userID)
+		user2, err := p.RegisterVisit(ctx, userID, "test-ip-hash-second")
 		require.NoError(t, err)
 		requireEqualUsers(t, secondExpected, user2)
 		requireStoredUser(t, db, schema, secondExpected)
@@ -201,9 +207,10 @@ func TestPostgresRegisterVisit(t *testing.T) {
 				SeenCount:   int64(i + 1),
 				FirstSeenAt: start,
 				LastSeenAt:  currentTime,
+				LastIPHash:  fmt.Sprintf("test-ip-hash-%d", i),
 			}
 
-			user, err := p.RegisterVisit(ctx, userID)
+			user, err := p.RegisterVisit(ctx, userID, fmt.Sprintf("test-ip-hash-%d", i))
 			require.NoError(t, err)
 
 			requireEqualUsers(t, expected, user)
@@ -218,6 +225,7 @@ func TestPostgresRegisterVisit(t *testing.T) {
 			SeenCount:   5,
 			FirstSeenAt: start,
 			LastSeenAt:  start.Add(4 * time.Hour),
+			LastIPHash:  "test-ip-hash-4",
 		})
 	})
 
@@ -241,36 +249,39 @@ func TestPostgresRegisterVisit(t *testing.T) {
 		t0 := currentTime
 
 		// User 1 visits twice
-		u1v1, err := p.RegisterVisit(ctx, user1ID)
+		u1v1, err := p.RegisterVisit(ctx, user1ID, "ip-hash-u1v1")
 		require.NoError(t, err)
 		requireEqualUsers(t, domain.User{
 			UserID:      user1ID,
 			SeenCount:   1,
 			FirstSeenAt: t0,
 			LastSeenAt:  t0,
+			LastIPHash:  "ip-hash-u1v1",
 		}, u1v1)
 
 		// Advance time
 		currentTime = currentTime.Add(1 * time.Minute)
 		t1 := currentTime
 
-		u1v2, err := p.RegisterVisit(ctx, user1ID)
+		u1v2, err := p.RegisterVisit(ctx, user1ID, "ip-hash-u1v2")
 		require.NoError(t, err)
 		requireEqualUsers(t, domain.User{
 			UserID:      user1ID,
 			SeenCount:   2,
 			FirstSeenAt: t0,
 			LastSeenAt:  t1,
+			LastIPHash:  "ip-hash-u1v2",
 		}, u1v2)
 
 		// User 2 visits once
-		u2v1, err := p.RegisterVisit(ctx, user2ID)
+		u2v1, err := p.RegisterVisit(ctx, user2ID, "ip-hash-u2v1")
 		require.NoError(t, err)
 		requireEqualUsers(t, domain.User{
 			UserID:      user2ID,
 			SeenCount:   1,
 			FirstSeenAt: t1,
 			LastSeenAt:  t1,
+			LastIPHash:  "ip-hash-u2v1",
 		}, u2v1)
 
 		// Verify both users in database
@@ -279,12 +290,14 @@ func TestPostgresRegisterVisit(t *testing.T) {
 			SeenCount:   2,
 			FirstSeenAt: t0,
 			LastSeenAt:  t1,
+			LastIPHash:  "ip-hash-u1v2",
 		})
 		requireStoredUser(t, db, schema, domain.User{
 			UserID:      user2ID,
 			SeenCount:   1,
 			FirstSeenAt: t1,
 			LastSeenAt:  t1,
+			LastIPHash:  "ip-hash-u2v1",
 		})
 	})
 
@@ -302,7 +315,7 @@ func TestPostgresRegisterVisit(t *testing.T) {
 
 		p, _ := newPostgres(t, db, "empty_userid", nowFunc)
 
-		_, err = p.RegisterVisit(ctx, "")
+		_, err = p.RegisterVisit(ctx, "", "")
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "userID is empty")
 	})
@@ -339,7 +352,7 @@ func TestPostgresRegisterVisit(t *testing.T) {
 		p, schema := newPostgres(t, db, "special_chars", nowFunc)
 		userID := "user@`-'example.com; DROP TABLE users;--"
 
-		user, err := p.RegisterVisit(ctx, userID)
+		user, err := p.RegisterVisit(ctx, userID, "test-ip-hash-special")
 		require.NoError(t, err)
 		require.Equal(t, userID, user.UserID)
 		require.Equal(t, int64(1), user.SeenCount)
