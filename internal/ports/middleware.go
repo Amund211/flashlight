@@ -23,11 +23,7 @@ func NewRequestLoggerMiddleware(logger *slog.Logger) func(next http.HandlerFunc)
 			ctx := r.Context()
 			correlationID := uuid.New().String()
 
-			userAgent := r.UserAgent()
-			if userAgent == "" {
-				userAgent = "<missing>"
-			}
-
+			userAgent := GetUserAgent(r)
 			userID := GetUserID(r)
 
 			requestLogger := logger.With(
@@ -57,10 +53,7 @@ func NewRateLimitMiddleware(rateLimiter ratelimiting.RequestRateLimiter, onLimit
 		return func(w http.ResponseWriter, r *http.Request) {
 			if !rateLimiter.Consume(r) {
 				ctx := r.Context()
-				userAgent := r.UserAgent()
-				if userAgent == "" {
-					userAgent = "<missing>"
-				}
+				userAgent := GetUserAgent(r)
 				userID := GetUserID(r)
 				ipHash := GetIPHash(r)
 
@@ -98,7 +91,7 @@ func BuildRegisterUserVisitMiddleware(registerUserVisit app.RegisterUserVisit) f
 
 				userID := GetUserID(r)
 				ipHash := GetIPHash(r)
-				userAgent := r.UserAgent()
+				userAgent := GetUserAgent(r)
 
 				_, _ = registerUserVisit(ctx, userID.LowCardinalityString(), ipHash, userAgent)
 			}()
@@ -128,7 +121,7 @@ func BuildBlocklistMiddleware(config BlocklistConfig) func(http.HandlerFunc) htt
 		return func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 			ipHash := GetIPHash(r)
-			userAgent := r.UserAgent()
+			userAgent := GetUserAgent(r)
 			userID := GetUserID(r)
 
 			badIP := slices.Contains(hashedIPs, ipHash)
@@ -167,10 +160,7 @@ func NewReportingMetaMiddleware(port string) func(http.HandlerFunc) http.Handler
 		return func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			userAgent := r.UserAgent()
-			if userAgent == "" {
-				userAgent = "<missing>"
-			}
+			userAgent := GetUserAgent(r)
 			methodPath := fmt.Sprintf("%s %s", r.Method, r.URL.Path)
 
 			ctx = reporting.AddTagsToContext(ctx,

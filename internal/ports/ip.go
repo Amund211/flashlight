@@ -28,7 +28,7 @@ func GetIP(r *http.Request) string {
 				"headerXForwardedFor": xff,
 				"remoteAddr":          r.RemoteAddr,
 				"method":              r.Method,
-				"userAgent":           r.UserAgent(),
+				"userAgent":           GetUserAgent(r),
 				"url":                 r.URL.String(),
 			},
 		)
@@ -71,7 +71,7 @@ func GetIP(r *http.Request) string {
 				"headerXForwardedFor": xff,
 				"remoteAddr":          r.RemoteAddr,
 				"method":              r.Method,
-				"userAgent":           r.UserAgent(),
+				"userAgent":           GetUserAgent(r),
 				"url":                 r.URL.String(),
 			},
 		)
@@ -90,7 +90,7 @@ func GetIP(r *http.Request) string {
 				"headerXForwardedFor": xff,
 				"remoteAddr":          r.RemoteAddr,
 				"method":              r.Method,
-				"userAgent":           r.UserAgent(),
+				"userAgent":           GetUserAgent(r),
 				"url":                 r.URL.String(),
 			},
 		)
