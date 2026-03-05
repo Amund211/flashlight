@@ -120,7 +120,7 @@ func TestGetIP(t *testing.T) {
 	}
 }
 
-func TestGetIPHash(t *testing.T) {
+func TestGetIP_Hash(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -172,7 +172,7 @@ func TestGetIPHash(t *testing.T) {
 			// Sanity check that expectedHash matches ports.IP(expectedIP).Hash()
 			require.Equal(t, c.expectedHash, ports.IP(c.expectedIP).Hash())
 
-			hash := ports.GetIPHash(req)
+			hash := ports.GetIP(req).Hash()
 
 			// Verify it's a valid hex string
 			require.Len(t, hash, 64, "SHA256 hash should be 64 hex characters")

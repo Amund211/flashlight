@@ -111,6 +111,4 @@ func GetIP(r *http.Request) IP {
 	return IP(parsed.String())
 }
 
-func GetIPHash(r *http.Request) string {
-	return GetIP(r).Hash()
-}
+
