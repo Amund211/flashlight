@@ -110,5 +110,3 @@ func GetIP(r *http.Request) IP {
 
 	return IP(parsed.String())
 }
-
-
