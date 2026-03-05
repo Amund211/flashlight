@@ -44,7 +44,7 @@ func GetIP(r *http.Request) IP {
 			},
 		)
 
-		return "<missing>"
+		return IP("<missing>")
 	}
 
 	// Two cases:
@@ -86,7 +86,7 @@ func GetIP(r *http.Request) IP {
 				"url":                 r.URL.String(),
 			},
 		)
-		return "<missing>"
+		return IP("<missing>")
 	}
 
 	clientIP := ips[len(ips)-1]
@@ -105,7 +105,7 @@ func GetIP(r *http.Request) IP {
 				"url":                 r.URL.String(),
 			},
 		)
-		return "<invalid>"
+		return IP("<invalid>")
 	}
 
 	return IP(parsed.String())
