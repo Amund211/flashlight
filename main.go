@@ -184,6 +184,8 @@ func main() {
 		fail("Failed to initialize GetTagsWithCache", "error", err.Error())
 	}
 
+	searchUsername := app.BuildSearchUsername(accountRepo)
+
 	getHistory := app.BuildGetHistory(playerRepo, updatePlayerInInterval)
 
 	getPlayerPITs := app.BuildGetPlayerPITs(playerRepo, updatePlayerInInterval)
@@ -231,6 +233,15 @@ func main() {
 			logger.With("port", "tags"),
 			sentryMiddleware,
 			blocklistConfig,
+		),
+	)
+
+	handleFunc(
+		"GET /v1/search/username",
+		ports.MakeSearchUsernameHandler(
+			searchUsername,
+			logger.With("port", "search_username"),
+			sentryMiddleware,
 		),
 	)
 

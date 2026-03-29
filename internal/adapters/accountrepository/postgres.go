@@ -261,3 +261,72 @@ func (p *Postgres) GetAccountByUsername(ctx context.Context, username string) (d
 		QueriedAt: entry.QueriedAt,
 	}, nil
 }
+
+func (p *Postgres) SearchUsername(ctx context.Context, searchTerm string, top int) ([]string, error) {
+	ctx, span := p.tracer.Start(ctx, "Postgres.SearchUsername")
+	defer span.End()
+
+	if top < 1 || top > 100 {
+		err := fmt.Errorf("top must be between 1 and 100")
+		reporting.Report(ctx, err, map[string]string{
+			"top": fmt.Sprintf("%d", top),
+		})
+		return nil, err
+	}
+
+	// Use a transaction to set search_path to include public schema for pg_trgm functions
+	txx, err := p.db.BeginTxx(ctx, nil)
+	if err != nil {
+		err := fmt.Errorf("failed to start transaction: %w", err)
+		reporting.Report(ctx, err)
+		return nil, err
+	}
+	defer txx.Rollback()
+
+	_, err = txx.ExecContext(ctx, fmt.Sprintf("SET LOCAL search_path TO %s, public", pq.QuoteIdentifier(p.schema)))
+	if err != nil {
+		err := fmt.Errorf("failed to set search path: %w", err)
+		reporting.Report(ctx, err, map[string]string{
+			"schema": p.schema,
+		})
+		return nil, err
+	}
+
+	// Set similarity threshold to a reasonable value for username search
+	// Lower threshold allows more fuzzy matching (default is 0.3)
+	_, err = txx.ExecContext(ctx, "SET LOCAL pg_trgm.similarity_threshold = 0.2")
+	if err != nil {
+		err := fmt.Errorf("failed to set similarity threshold: %w", err)
+		reporting.Report(ctx, err)
+		return nil, err
+	}
+
+	// Initialize to empty slice instead of nil for consistent JSON marshaling ([] vs null)
+	uuids := []string{}
+	err = txx.SelectContext(ctx, &uuids, `
+		SELECT player_uuid
+		FROM usernames
+		WHERE username % $1
+		ORDER BY similarity(username, $1) DESC, queried_at DESC
+		LIMIT $2`,
+		searchTerm,
+		top,
+	)
+	if err != nil {
+		err := fmt.Errorf("failed to search usernames: %w", err)
+		reporting.Report(ctx, err, map[string]string{
+			"searchTerm": searchTerm,
+			"top":        fmt.Sprintf("%d", top),
+		})
+		return nil, err
+	}
+
+	err = txx.Commit()
+	if err != nil {
+		err := fmt.Errorf("failed to commit transaction: %w", err)
+		reporting.Report(ctx, err)
+		return nil, err
+	}
+
+	return uuids, nil
+}
