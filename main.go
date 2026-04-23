@@ -330,6 +330,20 @@ func main() {
 		),
 	)
 
+	handleFunc(
+		"OPTIONS /v2/player/{uuid}",
+		ports.BuildCORSHandler(allowedOrigins),
+	)
+	handleFunc(
+		"GET /v2/player/{uuid}",
+		ports.MakeGetPlayerV2Handler(
+			getAndPersistPlayerWithCache,
+			allowedOrigins,
+			logger.With("port", "player-v2"),
+			sentryMiddleware,
+		),
+	)
+
 	// TODO: Remove
 	handleFunc(
 		"GET /playerdata",
