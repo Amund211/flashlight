@@ -24,7 +24,7 @@ func newPostgres(t *testing.T, db *sqlx.DB, schemaSuffix string) *Postgres {
 
 	db.MustExec(fmt.Sprintf("DROP SCHEMA IF EXISTS %s CASCADE", pgx.Identifier{schema}.Sanitize()))
 
-	migrator := database.NewDatabaseMigrator(db, logger)
+	migrator := database.NewDatabaseMigrator(database.LocalConnectionString, logger)
 
 	err := migrator.Migrate(t.Context(), schema)
 	require.NoError(t, err)

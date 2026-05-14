@@ -1,10 +1,11 @@
 package database
 
 import (
+	"database/sql"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
 
 	"github.com/Amund211/flashlight/internal/config"
@@ -38,20 +39,34 @@ func NewPostgresDatabase(connectionString string) (*sqlx.DB, error) {
 	return db, nil
 }
 
-func NewCloudsqlPostgresDatabase(conf config.Config) (*sqlx.DB, error) {
-	var connectionString string
+func ConnectionString(conf config.Config) string {
 	if conf.IsDevelopment() {
-		connectionString = LocalConnectionString
-	} else {
-		connectionString = GetCloudSQLConnectionString(conf.DBUsername(), conf.DBPassword(), conf.CloudSQLUnixSocketPath())
+		return LocalConnectionString
 	}
+	return GetCloudSQLConnectionString(conf.DBUsername(), conf.DBPassword(), conf.CloudSQLUnixSocketPath())
+}
 
-	db, err := NewPostgresDatabase(connectionString)
+// openSchemaScopedDB returns a one-off *sql.DB whose every connection has its
+// search_path set to schemaName. Used by the migrator (and its tests) so
+// migrate's WithInstance driver runs unqualified SQL in the right schema
+// regardless of which conn from the pool it borrows.
+//
+// The schema name is double-quoted before being sent as a startup parameter:
+// Postgres parses each comma-separated entry of search_path as a SQL
+// identifier, so unquoted entries get lower-cased and reject hyphens. Without
+// the quoting, mixed-case or hyphenated schema names silently resolve to a
+// non-existent schema and unqualified DDL fails with SQLSTATE 3F000.
+func openSchemaScopedDB(connectionString, schemaName string) (*sql.DB, error) {
+	connConfig, err := pgx.ParseConfig(connectionString)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create postgres database: %w", err)
+		return nil, fmt.Errorf("failed to parse connection config: %w", err)
 	}
+	if connConfig.RuntimeParams == nil {
+		connConfig.RuntimeParams = map[string]string{}
+	}
+	connConfig.RuntimeParams["search_path"] = pgx.Identifier{schemaName}.Sanitize()
 
-	return db, nil
+	return stdlib.OpenDB(*connConfig), nil
 }
 
 func createDatabaseIfNotExists(db *sqlx.DB, dbName string) error {

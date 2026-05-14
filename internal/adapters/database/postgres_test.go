@@ -33,7 +33,7 @@ func TestDB(t *testing.T) {
 	t.Run("createDatabaseIfNotExists", func(t *testing.T) {
 		t.Parallel()
 
-		db, err := sqlx.Connect("postgres", LocalConnectionString)
+		db, err := sqlx.Connect("pgx", LocalConnectionString)
 		require.NoError(t, err)
 		t.Run("already existing", func(t *testing.T) {
 			t.Parallel()

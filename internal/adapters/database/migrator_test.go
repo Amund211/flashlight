@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
+	pgxmigrate "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
@@ -31,29 +31,27 @@ func TestMigrator(t *testing.T) {
 		db.MustExec(fmt.Sprintf("DROP SCHEMA IF EXISTS %s CASCADE", pgx.Identifier{schemaName}.Sanitize()))
 
 		logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-		migrator := NewDatabaseMigrator(db, logger)
+		migrator := NewDatabaseMigrator(LocalConnectionString, logger)
 
 		err = migrator.migrate(ctx, schemaName)
 		require.NoError(t, err, "error migrating up")
 
 		// Migrate down manually
-		conn, err := db.Conn(ctx)
+		schemaDB, err := openSchemaScopedDB(LocalConnectionString, schemaName)
 		require.NoError(t, err)
-		defer conn.Close()
-		_, err = conn.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pgx.Identifier{schemaName}.Sanitize()))
-		require.NoError(t, err)
+		defer schemaDB.Close()
 
 		migrationSource, err := iofs.New(embeddedMigrations, "migrations")
 		require.NoError(t, err)
 		defer migrationSource.Close()
 
-		dbDriver, err := postgres.WithConnection(ctx, conn, &postgres.Config{
+		dbDriver, err := pgxmigrate.WithInstance(schemaDB, &pgxmigrate.Config{
 			DatabaseName: DBName,
 			SchemaName:   schemaName,
 		})
 		require.NoError(t, err)
 
-		migratorInstance, err := migrate.NewWithInstance("iofs", migrationSource, "postgres", dbDriver)
+		migratorInstance, err := migrate.NewWithInstance("iofs", migrationSource, "pgx5", dbDriver)
 		require.NoError(t, err)
 		defer migratorInstance.Close()
 
