@@ -9,7 +9,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,7 +28,7 @@ func TestMigrator(t *testing.T) {
 		db, err := NewPostgresDatabase(LocalConnectionString)
 		require.NoError(t, err)
 
-		db.MustExec(fmt.Sprintf("DROP SCHEMA IF EXISTS %s CASCADE", pq.QuoteIdentifier(schemaName)))
+		db.MustExec(fmt.Sprintf("DROP SCHEMA IF EXISTS %s CASCADE", pgx.Identifier{schemaName}.Sanitize()))
 
 		logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 		migrator := NewDatabaseMigrator(db, logger)
@@ -40,7 +40,7 @@ func TestMigrator(t *testing.T) {
 		conn, err := db.Conn(ctx)
 		require.NoError(t, err)
 		defer conn.Close()
-		_, err = conn.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pq.QuoteIdentifier(schemaName)))
+		_, err = conn.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pgx.Identifier{schemaName}.Sanitize()))
 		require.NoError(t, err)
 
 		migrationSource, err := iofs.New(embeddedMigrations, "migrations")

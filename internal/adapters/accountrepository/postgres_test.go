@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 
 	"github.com/Amund211/flashlight/internal/adapters/database"
@@ -22,7 +22,7 @@ func newPostgres(t *testing.T, db *sqlx.DB, schemaSuffix string) *Postgres {
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-	db.MustExec(fmt.Sprintf("DROP SCHEMA IF EXISTS %s CASCADE", pq.QuoteIdentifier(schema)))
+	db.MustExec(fmt.Sprintf("DROP SCHEMA IF EXISTS %s CASCADE", pgx.Identifier{schema}.Sanitize()))
 
 	migrator := database.NewDatabaseMigrator(db, logger)
 
@@ -61,7 +61,7 @@ func TestPostgres(t *testing.T) {
 			require.NoError(t, err)
 			defer txx.Rollback()
 
-			_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pq.QuoteIdentifier(p.schema)))
+			_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pgx.Identifier{p.schema}.Sanitize()))
 			require.NoError(t, err)
 
 			var entries []dbUsernamesEntry
@@ -102,7 +102,7 @@ func TestPostgres(t *testing.T) {
 			require.NoError(t, err)
 			defer txx.Rollback()
 
-			_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pq.QuoteIdentifier(p.schema)))
+			_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pgx.Identifier{p.schema}.Sanitize()))
 			require.NoError(t, err)
 
 			var entries []dbUsernameQueriesEntry

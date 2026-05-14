@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 
 	"github.com/Amund211/flashlight/internal/adapters/database"
@@ -23,7 +23,7 @@ import (
 func newPostgresPlayerRepository(t *testing.T, db *sqlx.DB, schema string) *PostgresPlayerRepository {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-	db.MustExec(fmt.Sprintf("DROP SCHEMA IF EXISTS %s CASCADE", pq.QuoteIdentifier(schema)))
+	db.MustExec(fmt.Sprintf("DROP SCHEMA IF EXISTS %s CASCADE", pgx.Identifier{schema}.Sanitize()))
 
 	migrator := database.NewDatabaseMigrator(db, logger)
 
@@ -73,7 +73,7 @@ func TestPostgresPlayerRepository(t *testing.T) {
 			require.NoError(t, err)
 			defer txx.Rollback()
 
-			_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pq.QuoteIdentifier(schemaName)))
+			_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pgx.Identifier{schemaName}.Sanitize()))
 			require.NoError(t, err)
 
 			row := txx.QueryRowx("SELECT COUNT(*) FROM stats WHERE player_uuid = $1 AND player_data = $2 AND queried_at = $3", normalizedUUID, playerData, player.QueriedAt)
@@ -249,7 +249,7 @@ func TestPostgresPlayerRepository(t *testing.T) {
 			require.NoError(t, err)
 			defer txx.Rollback()
 
-			_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pq.QuoteIdentifier(schemaName)))
+			_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pgx.Identifier{schemaName}.Sanitize()))
 			require.NoError(t, err)
 
 			_, err = txx.ExecContext(
@@ -353,7 +353,7 @@ func TestPostgresPlayerRepository(t *testing.T) {
 			require.NoError(t, err)
 			defer txx.Rollback()
 
-			_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pq.QuoteIdentifier(schemaName)))
+			_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pgx.Identifier{schemaName}.Sanitize()))
 			require.NoError(t, err)
 
 			// Only one row for this player should exist
@@ -577,7 +577,7 @@ func TestPostgresPlayerRepository(t *testing.T) {
 			require.NoError(t, err)
 			defer txx.Rollback()
 
-			_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pq.QuoteIdentifier(p.schema)))
+			_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pgx.Identifier{p.schema}.Sanitize()))
 			require.NoError(t, err)
 
 			_, err = txx.ExecContext(ctx, "DELETE FROM stats")
@@ -591,7 +591,7 @@ func TestPostgresPlayerRepository(t *testing.T) {
 			require.NoError(t, err)
 			defer txx.Rollback()
 
-			_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pq.QuoteIdentifier(p.schema)))
+			_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pgx.Identifier{p.schema}.Sanitize()))
 			require.NoError(t, err)
 
 			var count int

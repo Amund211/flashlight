@@ -3,8 +3,9 @@ package database
 import (
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 
 	"github.com/Amund211/flashlight/internal/config"
 )
@@ -24,7 +25,7 @@ func GetSchemaName(isTesting bool) string {
 }
 
 func NewPostgresDatabase(connectionString string) (*sqlx.DB, error) {
-	db, err := sqlx.Connect("postgres", connectionString)
+	db, err := sqlx.Connect("pgx", connectionString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to db: %w", err)
 	}
@@ -68,7 +69,7 @@ func createDatabaseIfNotExists(db *sqlx.DB, dbName string) error {
 		return nil
 	}
 
-	_, err := db.Exec(fmt.Sprintf("CREATE DATABASE %s", pq.QuoteIdentifier(dbName)))
+	_, err := db.Exec(fmt.Sprintf("CREATE DATABASE %s", pgx.Identifier{dbName}.Sanitize()))
 	if err != nil {
 		return fmt.Errorf("createDB: failed to create database: %w", err)
 	}
