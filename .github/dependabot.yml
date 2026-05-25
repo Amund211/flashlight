@@ -64,8 +64,6 @@ updates:
       # Leave major updates and security updates to their own PRs
       minor-updates:
         applies-to: 'version-updates'
-        patterns:
-          - '*'
         exclude-patterns:
           # Keep this dependency out of the bundle:
           # - version must stay in sync with .pre-commit-config.yaml
