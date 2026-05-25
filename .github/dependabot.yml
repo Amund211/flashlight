@@ -64,6 +64,10 @@ updates:
       # Leave major updates and security updates to their own PRs
       minor-updates:
         applies-to: 'version-updates'
+        patterns:
+          - '*'
+        exclude-patterns:
+          - 'github.com/golangci/golangci-lint/v2'
         update-types:
           - 'patch'
           - 'minor'
