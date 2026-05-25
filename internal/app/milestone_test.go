@@ -45,9 +45,10 @@ func TestFindMilestoneAchievements(t *testing.T) {
 	t.Run("stars converted to experience", func(t *testing.T) {
 		t.Parallel()
 
-		p1 := domaintest.NewPlayerBuilder(playerUUID).WithExperience(550).Build(time.Date(2024, time.January, 1, 12, 0, 0, 0, time.UTC))
-		p2 := domaintest.NewPlayerBuilder(playerUUID).WithExperience(3600).Build(time.Date(2024, time.January, 5, 15, 30, 0, 0, time.UTC))
-		p3 := domaintest.NewPlayerBuilder(playerUUID).WithExperience(487_550).Build(time.Date(2024, time.March, 5, 15, 30, 0, 0, time.UTC))
+		builder := domaintest.NewPlayerBuilder(playerUUID)
+		p1 := builder.WithExperience(550).Build(time.Date(2024, time.January, 1, 12, 0, 0, 0, time.UTC))
+		p2 := builder.WithExperience(3600).Build(time.Date(2024, time.January, 5, 15, 30, 0, 0, time.UTC))
+		p3 := builder.WithExperience(487_550).Build(time.Date(2024, time.March, 5, 15, 30, 0, 0, time.UTC))
 
 		starMilestones := []int64{1, 3, 100}
 		expMilestones := []int64{domain.StarsToExperience(1), domain.StarsToExperience(3), domain.StarsToExperience(100)}
@@ -98,8 +99,9 @@ func TestFindMilestoneAchievements(t *testing.T) {
 
 		milestones := []int64{1000, 2000, 3000}
 
-		p1 := domaintest.NewPlayerBuilder(playerUUID).WithExperience(1050).Build(time.Date(2024, time.March, 01, 10, 0, 0, 0, time.UTC))
-		p2 := domaintest.NewPlayerBuilder(playerUUID).WithExperience(3200).Build(time.Date(2024, time.March, 10, 16, 45, 0, 0, time.UTC))
+		builder := domaintest.NewPlayerBuilder(playerUUID)
+		p1 := builder.WithExperience(1050).Build(time.Date(2024, time.March, 01, 10, 0, 0, 0, time.UTC))
+		p2 := builder.WithExperience(3200).Build(time.Date(2024, time.March, 10, 16, 45, 0, 0, time.UTC))
 
 		mockRepo := &mockMilestoneRepository{
 			t:                  t,

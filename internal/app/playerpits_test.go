@@ -44,6 +44,7 @@ func TestBuildGetPlayerPITs(t *testing.T) {
 		t.Parallel()
 
 		uuid := domaintest.NewUUID(t)
+		builder := domaintest.NewPlayerBuilder(uuid).FromDB()
 
 		timeCases := []struct {
 			name  string
@@ -103,9 +104,9 @@ func TestBuildGetPlayerPITs(t *testing.T) {
 			{
 				name: "data",
 				playerPITs: []domain.PlayerPIT{
-					domaintest.NewPlayerBuilder(uuid).FromDB().WithExperience(500).Build(now),
-					domaintest.NewPlayerBuilder(uuid).FromDB().WithExperience(501).Build(now.Add(1 * time.Minute)),
-					domaintest.NewPlayerBuilder(uuid).FromDB().WithExperience(502).Build(now.Add(2 * time.Minute)),
+					builder.WithExperience(500).Build(now),
+					builder.WithExperience(501).Build(now.Add(1 * time.Minute)),
+					builder.WithExperience(502).Build(now.Add(2 * time.Minute)),
 				},
 			},
 		}
@@ -147,13 +148,14 @@ func TestBuildGetPlayerPITs(t *testing.T) {
 		t.Parallel()
 
 		uuid := domaintest.NewUUID(t)
+		builder := domaintest.NewPlayerBuilder(uuid).FromDB()
 
 		start := time.Date(2024, time.March, 1, 0, 0, 0, 0, time.UTC)
 		end := time.Date(2024, time.March, 31, 23, 59, 59, 999_999_999, time.UTC)
 
 		expectedPlayerPITs := []domain.PlayerPIT{
-			domaintest.NewPlayerBuilder(uuid).FromDB().WithExperience(500).Build(now),
-			domaintest.NewPlayerBuilder(uuid).FromDB().WithExperience(501).Build(now),
+			builder.WithExperience(500).Build(now),
+			builder.WithExperience(501).Build(now),
 		}
 
 		updatePlayerInIntervalCalled := false

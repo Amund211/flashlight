@@ -69,15 +69,10 @@ func TestMakeGetSessionsHandler(t *testing.T) {
 	endStr := "2023-01-01T01:00:00Z"
 
 	// Create player PITs that will be returned by GetPlayerPITs
+	fours := domaintest.NewPlayerBuilder(uuid).FromDB().Fours()
 	stats := []domain.PlayerPIT{
-		domaintest.NewPlayerBuilder(uuid).
-			WithExperience(500).
-			FromDB().
-			Fours().WithGamesPlayed(10).WithFinalKills(10).Build(start),
-		domaintest.NewPlayerBuilder(uuid).
-			WithExperience(1000).
-			FromDB().
-			Fours().WithGamesPlayed(11).WithFinalKills(11).Build(end),
+		fours.WithGamesPlayed(10).WithFinalKills(10).WithExperience(500).Build(start),
+		fours.WithGamesPlayed(11).WithFinalKills(11).WithExperience(1000).Build(end),
 	}
 
 	// Expected sessions computed from stats
