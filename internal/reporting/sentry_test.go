@@ -93,6 +93,21 @@ func TestSanitizeError(t *testing.T) {
 				error: `failed to send request: Get "https://api.mojang.com/users/profiles/minecraft/someplayer":"someextraerrorhere"`,
 				want:  `failed to send request: Get "https://api.mojang.com/users/profiles/minecraft/<username>":"someextraerrorhere"`,
 			},
+			{
+				// Constructed - Hypixel request by username
+				error: `failed to send request: Get "https://api.hypixel.net/v2/player?name=someplayer": context deadline exceeded (Client.Timeout exceeded while awaiting headers)`,
+				want:  `failed to send request: Get "https://api.hypixel.net/v2/player?name=<username>": context deadline exceeded (Client.Timeout exceeded while awaiting headers)`,
+			},
+			{
+				// Constructed - only replace the username query parameter
+				error: `failed to send request: Get "https://api.hypixel.net/v2/player?name=someplayer&key=still-here": failed`,
+				want:  `failed to send request: Get "https://api.hypixel.net/v2/player?name=<username>&key=still-here": failed`,
+			},
+			{
+				// Constructed - no match
+				error: `failed to send request: Get "https://api.hypixel.net/v2/player?name=player with spaces": failed`,
+				want:  `failed to send request: Get "https://api.hypixel.net/v2/player?name=player with spaces": failed`,
+			},
 		}
 		for _, tc := range cases {
 			t.Run(tc.error, func(t *testing.T) {
@@ -114,6 +129,11 @@ func TestSanitizeError(t *testing.T) {
 				// Real error - double sanitization
 				error: `failed to send request: Get "https://api.mojang.com/users/profiles/minecraft/user123": read tcp [fddf:1111:ffff:dddd::c123]:34567->[1234:1b3:51:1::27]:443: read: connection reset by peer`,
 				want:  `failed to send request: Get "https://api.mojang.com/users/profiles/minecraft/<username>": read tcp <host>-><host>: read: connection reset by peer`,
+			},
+			{
+				// Constructed - double sanitization
+				error: `failed to send request: Get "https://api.hypixel.net/v2/player?name=user123": read tcp [fddf:1111:ffff:dddd::c123]:34567->[1234:1b3:51:1::27]:443: read: connection reset by peer`,
+				want:  `failed to send request: Get "https://api.hypixel.net/v2/player?name=<username>": read tcp <host>-><host>: read: connection reset by peer`,
 			},
 		}
 
