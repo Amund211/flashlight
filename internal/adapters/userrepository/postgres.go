@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
@@ -65,7 +65,7 @@ func (p *Postgres) RegisterVisit(ctx context.Context, userID string, ipHash stri
 			last_user_agent = EXCLUDED.last_user_agent,
 			seen_count = users.seen_count + 1
 		RETURNING user_id, first_seen_at, last_seen_at, last_ip_hash, last_user_agent, seen_count`,
-			pq.QuoteIdentifier(p.schema)),
+			pgx.Identifier{p.schema}.Sanitize()),
 		userID,
 		now,
 		ipHash,

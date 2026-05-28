@@ -8,25 +8,24 @@ import (
 	"log/slog"
 
 	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
+	pgxmigrate "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5"
 )
 
 //go:embed migrations/*.sql
 var embeddedMigrations embed.FS
 
 type migrator struct {
-	db *sqlx.DB
+	connectionString string
 
 	logger *slog.Logger
 }
 
-func NewDatabaseMigrator(db *sqlx.DB, logger *slog.Logger) *migrator {
+func NewDatabaseMigrator(connectionString string, logger *slog.Logger) *migrator {
 	return &migrator{
-		db:     db,
-		logger: logger,
+		connectionString: connectionString,
+		logger:           logger,
 	}
 }
 
@@ -35,20 +34,15 @@ func (m *migrator) Migrate(ctx context.Context, schemaName string) error {
 }
 
 func (m *migrator) migrate(ctx context.Context, schemaName string) error {
-	conn, err := m.db.Conn(ctx)
+	db, err := openSchemaScopedDB(m.connectionString, schemaName)
 	if err != nil {
-		return fmt.Errorf("migrate: failed to connect to db: %w", err)
+		return fmt.Errorf("migrate: %w", err)
 	}
-	defer conn.Close()
+	defer db.Close()
 
-	_, err = conn.ExecContext(ctx, fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", pq.QuoteIdentifier(schemaName)))
+	_, err = db.ExecContext(ctx, fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", pgx.Identifier{schemaName}.Sanitize()))
 	if err != nil {
 		return fmt.Errorf("migrate: failed to create schema: %w", err)
-	}
-
-	_, err = conn.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pq.QuoteIdentifier(schemaName)))
-	if err != nil {
-		return fmt.Errorf("migrate: failed to set search path: %w", err)
 	}
 
 	migrationSource, err := iofs.New(embeddedMigrations, "migrations")
@@ -57,15 +51,15 @@ func (m *migrator) migrate(ctx context.Context, schemaName string) error {
 	}
 	defer migrationSource.Close()
 
-	dbDriver, err := postgres.WithConnection(ctx, conn, &postgres.Config{
+	dbDriver, err := pgxmigrate.WithInstance(db, &pgxmigrate.Config{
 		DatabaseName: DBName,
 		SchemaName:   schemaName,
 	})
 	if err != nil {
-		return fmt.Errorf("migrate: failed to create postgres driver: %w", err)
+		return fmt.Errorf("migrate: failed to create pgx driver: %w", err)
 	}
 
-	migratorInstance, err := migrate.NewWithInstance("iofs", migrationSource, "postgres", dbDriver)
+	migratorInstance, err := migrate.NewWithInstance("iofs", migrationSource, "pgx5", dbDriver)
 	if err != nil {
 		return fmt.Errorf("migrate: failed to create migration instance: %w", err)
 	}

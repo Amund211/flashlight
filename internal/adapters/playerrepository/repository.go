@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
@@ -208,7 +208,7 @@ func (p *PostgresPlayerRepository) StorePlayer(ctx context.Context, player *doma
 	}
 	defer txx.Rollback()
 
-	_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pq.QuoteIdentifier(p.schema)))
+	_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pgx.Identifier{p.schema}.Sanitize()))
 	if err != nil {
 		err := fmt.Errorf("failed to set search path: %w", err)
 		reporting.Report(ctx, err, map[string]string{
@@ -328,7 +328,7 @@ func (p *PostgresPlayerRepository) GetHistory(ctx context.Context, playerUUID st
 	}
 	defer txx.Rollback()
 
-	_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pq.QuoteIdentifier(p.schema)))
+	_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pgx.Identifier{p.schema}.Sanitize()))
 	if err != nil {
 		err := fmt.Errorf("failed to set search path: %w", err)
 		reporting.Report(ctx, err, map[string]string{
@@ -480,7 +480,7 @@ func (p *PostgresPlayerRepository) GetPlayerPITs(ctx context.Context, playerUUID
 	}
 	defer conn.Close()
 
-	_, err = conn.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pq.QuoteIdentifier(p.schema)))
+	_, err = conn.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pgx.Identifier{p.schema}.Sanitize()))
 	if err != nil {
 		err := fmt.Errorf("failed to set search path: %w", err)
 		reporting.Report(ctx, err, map[string]string{
@@ -600,7 +600,7 @@ func (p *PostgresPlayerRepository) FindMilestoneAchievements(ctx context.Context
 	}
 	defer txx.Rollback()
 
-	_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pq.QuoteIdentifier(p.schema)))
+	_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pgx.Identifier{p.schema}.Sanitize()))
 	if err != nil {
 		err := fmt.Errorf("failed to set search path: %w", err)
 		reporting.Report(ctx, err, map[string]string{

@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jmoiron/sqlx"
-	"github.com/lib/pq"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 
@@ -67,7 +67,7 @@ func (p *Postgres) StoreAccount(ctx context.Context, account domain.Account) err
 	}
 	defer txx.Rollback()
 
-	_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pq.QuoteIdentifier(p.schema)))
+	_, err = txx.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pgx.Identifier{p.schema}.Sanitize()))
 	if err != nil {
 		err := fmt.Errorf("failed to set search path: %w", err)
 		reporting.Report(ctx, err, map[string]string{
@@ -168,7 +168,7 @@ func (p *Postgres) RemoveUsername(ctx context.Context, username string) error {
 	_, err := p.db.ExecContext(ctx, fmt.Sprintf(`
 			DELETE FROM %s.usernames
 			WHERE lower(username) = lower($1)`,
-		pq.QuoteIdentifier(p.schema),
+		pgx.Identifier{p.schema}.Sanitize(),
 	),
 		username,
 	)
@@ -200,7 +200,7 @@ func (p *Postgres) GetAccountByUUID(ctx context.Context, uuid string) (domain.Ac
 		player_uuid, username, queried_at
 		FROM %s.usernames
 		WHERE player_uuid = $1`,
-		pq.QuoteIdentifier(p.schema),
+		pgx.Identifier{p.schema}.Sanitize(),
 	),
 		uuid,
 	)
@@ -232,7 +232,7 @@ func (p *Postgres) GetAccountByUsername(ctx context.Context, username string) (d
 		player_uuid, username, queried_at
 		FROM %s.usernames
 		WHERE lower(username) = lower($1)`,
-		pq.QuoteIdentifier(p.schema),
+		pgx.Identifier{p.schema}.Sanitize(),
 	),
 		username,
 	)

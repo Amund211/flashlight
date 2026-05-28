@@ -130,7 +130,8 @@ func main() {
 	logger.InfoContext(ctx, "Initialized Sentry middleware")
 
 	logger.InfoContext(ctx, "Initializing database connection")
-	db, err := database.NewCloudsqlPostgresDatabase(config)
+	connectionString := database.ConnectionString(config)
+	db, err := database.NewPostgresDatabase(connectionString)
 	if err != nil {
 		fail("Failed to initialize PostgresPlayerRepository", "error", err.Error())
 	}
@@ -145,7 +146,7 @@ func main() {
 
 	repositorySchemaName := database.GetSchemaName(!config.IsProduction())
 
-	err = database.NewDatabaseMigrator(db, logger.With("component", "migrator")).Migrate(ctx, repositorySchemaName)
+	err = database.NewDatabaseMigrator(connectionString, logger.With("component", "migrator")).Migrate(ctx, repositorySchemaName)
 	if err != nil {
 		fail("Failed to migrate database", "error", err.Error())
 	}
