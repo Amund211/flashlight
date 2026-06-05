@@ -401,11 +401,12 @@ func TestPostgresPlayerRepository(t *testing.T) {
 			t.Parallel()
 
 			playerUUID := domaintest.NewUUID(t)
+			fours := domaintest.NewPlayerBuilder(playerUUID).Fours()
 
-			p1 := domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(1).BuildPtr(now.Add(-2 * time.Hour))
-			p2 := domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(2).BuildPtr(now)
-			p3 := domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(3).BuildPtr(now.Add(2 * time.Minute))
-			p4 := domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(4).BuildPtr(now.Add(2 * time.Hour))
+			p1 := fours.WithGamesPlayed(1).BuildPtr(now.Add(-2 * time.Hour))
+			p2 := fours.WithGamesPlayed(2).BuildPtr(now)
+			p3 := fours.WithGamesPlayed(3).BuildPtr(now.Add(2 * time.Minute))
+			p4 := fours.WithGamesPlayed(4).BuildPtr(now.Add(2 * time.Hour))
 
 			storePlayers(t, p, p1, p2, p3, p4)
 
@@ -657,33 +658,35 @@ func TestPostgresPlayerRepository(t *testing.T) {
 			playerUUID := domaintest.NewUUID(t)
 			start := time.Date(2021, time.January, 1, 0, 0, 0, 0, time.FixedZone("UTC", -3600*8))
 
+			fours := domaintest.NewPlayerBuilder(playerUUID).Fours()
+
 			players := make([]*domain.PlayerPIT, 13)
 			// Before start
-			players[0] = domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(0).BuildPtr(start.Add(0 * time.Hour).Add(-1 * time.Minute))
+			players[0] = fours.WithGamesPlayed(0).BuildPtr(start.Add(0 * time.Hour).Add(-1 * time.Minute))
 
 			// First 30 min interval
-			players[1] = domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(1).BuildPtr(start.Add(0 * time.Hour).Add(7 * time.Minute))
-			players[2] = domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(2).BuildPtr(start.Add(0 * time.Hour).Add(17 * time.Minute))
+			players[1] = fours.WithGamesPlayed(1).BuildPtr(start.Add(0 * time.Hour).Add(7 * time.Minute))
+			players[2] = fours.WithGamesPlayed(2).BuildPtr(start.Add(0 * time.Hour).Add(17 * time.Minute))
 
 			// Second 30 min interval
-			players[3] = domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(3).BuildPtr(start.Add(0 * time.Hour).Add(37 * time.Minute))
+			players[3] = fours.WithGamesPlayed(3).BuildPtr(start.Add(0 * time.Hour).Add(37 * time.Minute))
 
 			// Sixth 30 min interval
-			players[4] = domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(4).BuildPtr(start.Add(2 * time.Hour).Add(40 * time.Minute))
-			players[5] = domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(5).BuildPtr(start.Add(2 * time.Hour).Add(45 * time.Minute))
-			players[6] = domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(6).BuildPtr(start.Add(2 * time.Hour).Add(50 * time.Minute))
-			players[7] = domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(7).BuildPtr(start.Add(2 * time.Hour).Add(55 * time.Minute))
+			players[4] = fours.WithGamesPlayed(4).BuildPtr(start.Add(2 * time.Hour).Add(40 * time.Minute))
+			players[5] = fours.WithGamesPlayed(5).BuildPtr(start.Add(2 * time.Hour).Add(45 * time.Minute))
+			players[6] = fours.WithGamesPlayed(6).BuildPtr(start.Add(2 * time.Hour).Add(50 * time.Minute))
+			players[7] = fours.WithGamesPlayed(7).BuildPtr(start.Add(2 * time.Hour).Add(55 * time.Minute))
 
 			// Seventh 30 min interval
-			players[8] = domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(8).BuildPtr(start.Add(3 * time.Hour).Add(1 * time.Minute))
+			players[8] = fours.WithGamesPlayed(8).BuildPtr(start.Add(3 * time.Hour).Add(1 * time.Minute))
 
 			// Eighth 30 min interval
-			players[9] = domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(9).BuildPtr(start.Add(3 * time.Hour).Add(47 * time.Minute))
-			players[10] = domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(0).BuildPtr(start.Add(3 * time.Hour).Add(59 * time.Minute))
+			players[9] = fours.WithGamesPlayed(9).BuildPtr(start.Add(3 * time.Hour).Add(47 * time.Minute))
+			players[10] = fours.WithGamesPlayed(0).BuildPtr(start.Add(3 * time.Hour).Add(59 * time.Minute))
 
 			// After end
-			players[11] = domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(1).BuildPtr(start.Add(4 * time.Hour).Add(1 * time.Minute))
-			players[12] = domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(2).BuildPtr(start.Add(4000 * time.Hour).Add(1 * time.Minute))
+			players[11] = fours.WithGamesPlayed(1).BuildPtr(start.Add(4 * time.Hour).Add(1 * time.Minute))
+			players[12] = fours.WithGamesPlayed(2).BuildPtr(start.Add(4000 * time.Hour).Add(1 * time.Minute))
 
 			setStoredStats(t, p, players...)
 
@@ -868,6 +871,8 @@ func TestPostgresPlayerRepository(t *testing.T) {
 		t.Run("GamemodeOverall and StatExperience", func(t *testing.T) {
 			t.Parallel()
 
+			builder := domaintest.NewPlayerBuilder(playerUUID)
+
 			tests := []struct {
 				name       string
 				players    []*domain.PlayerPIT
@@ -877,16 +882,16 @@ func TestPostgresPlayerRepository(t *testing.T) {
 				{
 					name: "Single milestone reached",
 					players: []*domain.PlayerPIT{
-						domaintest.NewPlayerBuilder(playerUUID).WithExperience(500).BuildPtr(time.Date(2021, time.January, 1, 12, 0, 0, 0, time.UTC)),
-						domaintest.NewPlayerBuilder(playerUUID).WithExperience(1000).BuildPtr(time.Date(2021, time.January, 2, 12, 0, 0, 0, time.UTC)),
-						domaintest.NewPlayerBuilder(playerUUID).WithExperience(1500).BuildPtr(time.Date(2021, time.January, 3, 12, 0, 0, 0, time.UTC)),
+						builder.WithExperience(500).BuildPtr(time.Date(2021, time.January, 1, 12, 0, 0, 0, time.UTC)),
+						builder.WithExperience(1000).BuildPtr(time.Date(2021, time.January, 2, 12, 0, 0, 0, time.UTC)),
+						builder.WithExperience(1500).BuildPtr(time.Date(2021, time.January, 3, 12, 0, 0, 0, time.UTC)),
 					},
 					milestones: []int64{1200},
 					expected: []domain.MilestoneAchievement{
 						{
 							Milestone: 1200,
 							After: &domain.MilestoneAchievementStats{
-								Player: domaintest.NewPlayerBuilder(playerUUID).WithExperience(1500).Build(time.Date(2021, time.January, 3, 12, 0, 0, 0, time.UTC)),
+								Player: builder.WithExperience(1500).Build(time.Date(2021, time.January, 3, 12, 0, 0, 0, time.UTC)),
 								Value:  1500,
 							},
 						},
@@ -895,31 +900,31 @@ func TestPostgresPlayerRepository(t *testing.T) {
 				{
 					name: "Multiple milestones reached",
 					players: []*domain.PlayerPIT{
-						domaintest.NewPlayerBuilder(playerUUID).WithExperience(500).BuildPtr(time.Date(2021, time.January, 1, 12, 0, 0, 0, time.UTC)),
-						domaintest.NewPlayerBuilder(playerUUID).WithExperience(1000).BuildPtr(time.Date(2021, time.January, 2, 12, 0, 0, 0, time.UTC)),
-						domaintest.NewPlayerBuilder(playerUUID).WithExperience(2000).BuildPtr(time.Date(2021, time.January, 3, 12, 0, 0, 0, time.UTC)),
-						domaintest.NewPlayerBuilder(playerUUID).WithExperience(3000).BuildPtr(time.Date(2021, time.January, 4, 12, 0, 0, 0, time.UTC)),
+						builder.WithExperience(500).BuildPtr(time.Date(2021, time.January, 1, 12, 0, 0, 0, time.UTC)),
+						builder.WithExperience(1000).BuildPtr(time.Date(2021, time.January, 2, 12, 0, 0, 0, time.UTC)),
+						builder.WithExperience(2000).BuildPtr(time.Date(2021, time.January, 3, 12, 0, 0, 0, time.UTC)),
+						builder.WithExperience(3000).BuildPtr(time.Date(2021, time.January, 4, 12, 0, 0, 0, time.UTC)),
 					},
 					milestones: []int64{800, 1500, 2500},
 					expected: []domain.MilestoneAchievement{
 						{
 							Milestone: 800,
 							After: &domain.MilestoneAchievementStats{
-								Player: domaintest.NewPlayerBuilder(playerUUID).WithExperience(1000).Build(time.Date(2021, time.January, 2, 12, 0, 0, 0, time.UTC)),
+								Player: builder.WithExperience(1000).Build(time.Date(2021, time.January, 2, 12, 0, 0, 0, time.UTC)),
 								Value:  1000,
 							},
 						},
 						{
 							Milestone: 1500,
 							After: &domain.MilestoneAchievementStats{
-								Player: domaintest.NewPlayerBuilder(playerUUID).WithExperience(2000).Build(time.Date(2021, time.January, 3, 12, 0, 0, 0, time.UTC)),
+								Player: builder.WithExperience(2000).Build(time.Date(2021, time.January, 3, 12, 0, 0, 0, time.UTC)),
 								Value:  2000,
 							},
 						},
 						{
 							Milestone: 2500,
 							After: &domain.MilestoneAchievementStats{
-								Player: domaintest.NewPlayerBuilder(playerUUID).WithExperience(3000).Build(time.Date(2021, time.January, 4, 12, 0, 0, 0, time.UTC)),
+								Player: builder.WithExperience(3000).Build(time.Date(2021, time.January, 4, 12, 0, 0, 0, time.UTC)),
 								Value:  3000,
 							},
 						},
@@ -928,8 +933,8 @@ func TestPostgresPlayerRepository(t *testing.T) {
 				{
 					name: "No milestones reached",
 					players: []*domain.PlayerPIT{
-						domaintest.NewPlayerBuilder(playerUUID).WithExperience(500).BuildPtr(time.Date(2021, time.January, 1, 12, 0, 0, 0, time.UTC)),
-						domaintest.NewPlayerBuilder(playerUUID).WithExperience(600).BuildPtr(time.Date(2021, time.January, 2, 12, 0, 0, 0, time.UTC)),
+						builder.WithExperience(500).BuildPtr(time.Date(2021, time.January, 1, 12, 0, 0, 0, time.UTC)),
+						builder.WithExperience(600).BuildPtr(time.Date(2021, time.January, 2, 12, 0, 0, 0, time.UTC)),
 					},
 					milestones: []int64{1000, 2000},
 					expected:   []domain.MilestoneAchievement{},
@@ -937,16 +942,16 @@ func TestPostgresPlayerRepository(t *testing.T) {
 				{
 					name: "Milestones skipped",
 					players: []*domain.PlayerPIT{
-						domaintest.NewPlayerBuilder(playerUUID).WithExperience(500).BuildPtr(time.Date(2021, time.January, 1, 12, 0, 0, 0, time.UTC)),
-						domaintest.NewPlayerBuilder(playerUUID).WithExperience(10_000).BuildPtr(time.Date(2021, time.January, 2, 12, 0, 0, 0, time.UTC)),
-						domaintest.NewPlayerBuilder(playerUUID).WithExperience(11_000).BuildPtr(time.Date(2021, time.January, 3, 12, 0, 0, 0, time.UTC)),
+						builder.WithExperience(500).BuildPtr(time.Date(2021, time.January, 1, 12, 0, 0, 0, time.UTC)),
+						builder.WithExperience(10_000).BuildPtr(time.Date(2021, time.January, 2, 12, 0, 0, 0, time.UTC)),
+						builder.WithExperience(11_000).BuildPtr(time.Date(2021, time.January, 3, 12, 0, 0, 0, time.UTC)),
 					},
 					milestones: []int64{1_000, 5_000, 8_000, 12_000},
 					expected: []domain.MilestoneAchievement{
 						{
 							Milestone: 8_000,
 							After: &domain.MilestoneAchievementStats{
-								Player: domaintest.NewPlayerBuilder(playerUUID).WithExperience(10_000).Build(time.Date(2021, time.January, 2, 12, 0, 0, 0, time.UTC)),
+								Player: builder.WithExperience(10_000).Build(time.Date(2021, time.January, 2, 12, 0, 0, 0, time.UTC)),
 								Value:  10_000,
 							},
 						},
@@ -955,16 +960,16 @@ func TestPostgresPlayerRepository(t *testing.T) {
 				{
 					name: "Milestones skipped - final reached",
 					players: []*domain.PlayerPIT{
-						domaintest.NewPlayerBuilder(playerUUID).WithExperience(500).BuildPtr(time.Date(2021, time.January, 1, 12, 0, 0, 0, time.UTC)),
-						domaintest.NewPlayerBuilder(playerUUID).WithExperience(100_000).BuildPtr(time.Date(2021, time.January, 2, 12, 0, 0, 0, time.UTC)),
-						domaintest.NewPlayerBuilder(playerUUID).WithExperience(200_000).BuildPtr(time.Date(2021, time.January, 3, 12, 0, 0, 0, time.UTC)),
+						builder.WithExperience(500).BuildPtr(time.Date(2021, time.January, 1, 12, 0, 0, 0, time.UTC)),
+						builder.WithExperience(100_000).BuildPtr(time.Date(2021, time.January, 2, 12, 0, 0, 0, time.UTC)),
+						builder.WithExperience(200_000).BuildPtr(time.Date(2021, time.January, 3, 12, 0, 0, 0, time.UTC)),
 					},
 					milestones: []int64{1_000, 5_000, 8_000, 12_000},
 					expected: []domain.MilestoneAchievement{
 						{
 							Milestone: 12_000,
 							After: &domain.MilestoneAchievementStats{
-								Player: domaintest.NewPlayerBuilder(playerUUID).WithExperience(100_000).Build(time.Date(2021, time.January, 2, 12, 0, 0, 0, time.UTC)),
+								Player: builder.WithExperience(100_000).Build(time.Date(2021, time.January, 2, 12, 0, 0, 0, time.UTC)),
 								Value:  100_000,
 							},
 						},
@@ -973,22 +978,22 @@ func TestPostgresPlayerRepository(t *testing.T) {
 				{
 					name: "Multiple sets of milestones skipped",
 					players: []*domain.PlayerPIT{
-						domaintest.NewPlayerBuilder(playerUUID).WithExperience(1_000).BuildPtr(time.Date(2025, time.March, 1, 19, 0, 0, 0, time.UTC)),
-						domaintest.NewPlayerBuilder(playerUUID).WithExperience(6_001).BuildPtr(time.Date(2025, time.March, 2, 19, 0, 0, 0, time.UTC)),
+						builder.WithExperience(1_000).BuildPtr(time.Date(2025, time.March, 1, 19, 0, 0, 0, time.UTC)),
+						builder.WithExperience(6_001).BuildPtr(time.Date(2025, time.March, 2, 19, 0, 0, 0, time.UTC)),
 					},
 					milestones: []int64{500, 600, 700, 800, 900, 1_000, 2_000, 3_000, 4_000, 5_000, 6_000, 7_000, 8_000, 9_000, 10_000},
 					expected: []domain.MilestoneAchievement{
 						{
 							Milestone: 1_000,
 							After: &domain.MilestoneAchievementStats{
-								Player: domaintest.NewPlayerBuilder(playerUUID).WithExperience(1_000).Build(time.Date(2025, time.March, 1, 19, 0, 0, 0, time.UTC)),
+								Player: builder.WithExperience(1_000).Build(time.Date(2025, time.March, 1, 19, 0, 0, 0, time.UTC)),
 								Value:  1_000,
 							},
 						},
 						{
 							Milestone: 6_000,
 							After: &domain.MilestoneAchievementStats{
-								Player: domaintest.NewPlayerBuilder(playerUUID).WithExperience(6_001).Build(time.Date(2025, time.March, 2, 19, 0, 0, 0, time.UTC)),
+								Player: builder.WithExperience(6_001).Build(time.Date(2025, time.March, 2, 19, 0, 0, 0, time.UTC)),
 								Value:  6_001,
 							},
 						},
