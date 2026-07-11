@@ -1,14 +1,12 @@
 package ports
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/Amund211/flashlight/internal/app"
 	"github.com/Amund211/flashlight/internal/logging"
@@ -17,33 +15,12 @@ import (
 	"github.com/Amund211/flashlight/internal/strutils"
 )
 
-type rainbowGameResult struct {
-	Gamemode   string `json:"gamemode"`
-	Outcome    string `json:"outcome"`
-	FinalKills int    `json:"finalKills"`
-	FinalDeath bool   `json:"finalDeath"`
-	BedsBroken int    `json:"bedsBroken"`
-	BedLost    bool   `json:"bedLost"`
-	Kills      int    `json:"kills"`
-	Deaths     int    `json:"deaths"`
-	Experience int64  `json:"experience"`
-}
-
-type rainbowGameSegment struct {
-	Start rainbowPlayerDataPIT `json:"start"`
-	End   rainbowPlayerDataPIT `json:"end"`
-	// Game is nil when the snapshot pair represents more than one game
-	// (gamesPlayed jumped >1, or multiple modes advanced).
-	Game *rainbowGameResult `json:"game"`
-}
-
-type rainbowSessionAtResponse struct {
-	Session *rainbowSession      `json:"session"`
-	Games   []rainbowGameSegment `json:"games"`
-}
-
-func MakeGetSessionAtHandler(
-	getSessionAt app.GetSessionAt,
+// MakeGetLatestSessionHandler serves POST /v1/session-at/latest. It returns the
+// same response body as the session-at handler, but takes only a uuid and
+// resolves the time itself (the player's latest session). See
+// app.BuildGetLatestSession.
+func MakeGetLatestSessionHandler(
+	getLatestSession app.GetLatestSession,
 	registerUserVisit app.RegisterUserVisit,
 	allowedOrigins *DomainSuffixes,
 	rootLogger *slog.Logger,
@@ -83,8 +60,8 @@ func MakeGetSessionAtHandler(
 		NewRequestLoggerMiddleware(rootLogger),
 		sentryMiddleware,
 		BuildBlocklistMiddleware(blocklistConfig),
-		buildMetricsMiddleware("session-at"),
-		NewReportingMetaMiddleware("session-at"),
+		buildMetricsMiddleware("session-at-latest"),
+		NewReportingMetaMiddleware("session-at-latest"),
 		BuildCORSMiddleware(allowedOrigins),
 		NewRateLimitMiddleware(ipRateLimiter, makeOnLimitExceeded(ipRateLimiter)),
 		NewRateLimitMiddleware(userIDRateLimiter, makeOnLimitExceeded(userIDRateLimiter)),
@@ -107,8 +84,7 @@ func MakeGetSessionAtHandler(
 			return
 		}
 		request := struct {
-			UUID string    `json:"uuid"`
-			Time time.Time `json:"time"`
+			UUID string `json:"uuid"`
 		}{}
 		err = json.Unmarshal(body, &request)
 		if err != nil {
@@ -117,10 +93,6 @@ func MakeGetSessionAtHandler(
 			return
 		}
 
-		ctx = reporting.AddExtrasToContext(ctx, map[string]string{
-			"time": request.Time.Format(time.RFC3339),
-		})
-
 		uuid, err := strutils.NormalizeUUID(request.UUID)
 		if err != nil {
 			logging.FromContext(ctx).WarnContext(ctx, "Failed to normalize uuid", "error", err, "rawUUID", request.UUID)
@@ -128,14 +100,8 @@ func MakeGetSessionAtHandler(
 			return
 		}
 
-		if request.Time.IsZero() {
-			http.Error(w, "missing time", http.StatusBadRequest)
-			return
-		}
-
-		logging.FromContext(ctx).InfoContext(ctx, "Handling session-at request",
+		logging.FromContext(ctx).InfoContext(ctx, "Handling latest-session request",
 			slog.String("uuid", uuid),
-			slog.String("time", request.Time.Format(time.RFC3339)),
 		)
 
 		ctx = reporting.AddExtrasToContext(ctx, map[string]string{
@@ -143,12 +109,11 @@ func MakeGetSessionAtHandler(
 		})
 		ctx = logging.AddMetaToContext(ctx,
 			slog.String("uuid", uuid),
-			slog.String("time", request.Time.Format(time.RFC3339)),
 		)
 
-		result, err := getSessionAt(ctx, uuid, request.Time)
+		result, err := getLatestSession(ctx, uuid)
 		if err != nil {
-			// NOTE: GetSessionAt implementations handle their own error reporting
+			// NOTE: GetLatestSession implementations handle their own error reporting
 			http.Error(w, "Failed to get session", http.StatusInternalServerError)
 			return
 		}
@@ -160,7 +125,7 @@ func MakeGetSessionAtHandler(
 			return
 		}
 
-		logging.FromContext(ctx).InfoContext(ctx, "Returning session at",
+		logging.FromContext(ctx).InfoContext(ctx, "Returning latest session",
 			"hasSession", result.Session != nil,
 			"gamesLength", len(result.Games),
 		)
@@ -171,62 +136,4 @@ func MakeGetSessionAtHandler(
 	}
 
 	return middleware(handler)
-}
-
-// marshalRainbowSessionAtResponse converts an app.SessionAtResult into the
-// rainbow-facing session-at wire format and marshals it to JSON. Both the
-// session-at and latest-session handlers use it so their response bodies are
-// byte-identical. Errors are reported to Sentry here; callers just surface a
-// 500.
-func marshalRainbowSessionAtResponse(ctx context.Context, result app.SessionAtResult) ([]byte, error) {
-	response := rainbowSessionAtResponse{
-		Session: nil,
-		Games:   make([]rainbowGameSegment, 0, len(result.Games)),
-	}
-	if result.Session != nil {
-		rbSession := sessionToRainbowSession(result.Session)
-		response.Session = &rbSession
-	}
-	for _, seg := range result.Games {
-		var game *rainbowGameResult
-		if seg.Game != nil {
-			rainbowGamemode, gErr := gamemodeToRainbowGamemode(seg.Game.Gamemode)
-			if gErr != nil {
-				err := fmt.Errorf("failed to convert gamemode: %w", gErr)
-				reporting.Report(ctx, err)
-				return nil, err
-			}
-			rainbowOutcome, oErr := gameOutcomeToRainbowOutcome(seg.Game.Outcome)
-			if oErr != nil {
-				err := fmt.Errorf("failed to convert outcome: %w", oErr)
-				reporting.Report(ctx, err)
-				return nil, err
-			}
-			game = &rainbowGameResult{
-				Gamemode:   rainbowGamemode,
-				Outcome:    rainbowOutcome,
-				FinalKills: seg.Game.FinalKills,
-				FinalDeath: seg.Game.FinalDeath,
-				BedsBroken: seg.Game.BedsBroken,
-				BedLost:    seg.Game.BedLost,
-				Kills:      seg.Game.Kills,
-				Deaths:     seg.Game.Deaths,
-				Experience: seg.Game.Experience,
-			}
-		}
-		response.Games = append(response.Games, rainbowGameSegment{
-			Start: playerToRainbowPlayerDataPIT(&seg.Start),
-			End:   playerToRainbowPlayerDataPIT(&seg.End),
-			Game:  game,
-		})
-	}
-
-	marshalled, err := json.Marshal(response)
-	if err != nil {
-		err := fmt.Errorf("failed to marshal response: %w", err)
-		reporting.Report(ctx, err)
-		return nil, err
-	}
-
-	return marshalled, nil
 }

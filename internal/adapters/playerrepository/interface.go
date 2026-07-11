@@ -14,5 +14,8 @@ type PlayerRepository interface {
 	GetPlayer(ctx context.Context, playerUUID string) (*domain.PlayerPIT, error)
 	GetHistory(ctx context.Context, playerUUID string, start, end time.Time, limit int) ([]domain.PlayerPIT, error)
 	GetPlayerPITs(ctx context.Context, playerUUID string, start, end time.Time) ([]domain.PlayerPIT, error)
+	// GetMostRecentPlayerPIT returns the most recently queried stat stored for
+	// the player, or domain.ErrPlayerNotFound if none exist.
+	GetMostRecentPlayerPIT(ctx context.Context, playerUUID string) (*domain.PlayerPIT, error)
 	FindMilestoneAchievements(ctx context.Context, playerUUID string, gamemode domain.Gamemode, stat domain.Stat, milestones []int64) ([]domain.MilestoneAchievement, error)
 }
