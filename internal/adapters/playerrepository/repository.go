@@ -672,6 +672,85 @@ func (p *PostgresPlayerRepository) GetMostRecentPlayerPIT(ctx context.Context, p
 	return player, nil
 }
 
+func (p *PostgresPlayerRepository) GetRecentPlayerPITs(ctx context.Context, playerUUID string, limit int) ([]domain.PlayerPIT, error) {
+	ctx, span := p.tracer.Start(ctx, "PostgresPlayerRepository.GetRecentPlayerPITs")
+	defer span.End()
+
+	if !strutils.UUIDIsNormalized(playerUUID) {
+		err := fmt.Errorf("uuid is not normalized")
+		reporting.Report(ctx, err, map[string]string{
+			"uuid": playerUUID,
+		})
+		return nil, err
+	}
+
+	if limit < 1 || limit > 1000 {
+		err := fmt.Errorf("invalid limit")
+		reporting.Report(ctx, err, map[string]string{
+			"limit": strconv.Itoa(limit),
+		})
+		return nil, err
+	}
+
+	conn, err := p.db.Connx(ctx)
+	if err != nil {
+		err := fmt.Errorf("failed to get connection: %w", err)
+		reporting.Report(ctx, err)
+		return nil, err
+	}
+	defer conn.Close()
+
+	_, err = conn.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pq.QuoteIdentifier(p.schema)))
+	if err != nil {
+		err := fmt.Errorf("failed to set search path: %w", err)
+		reporting.Report(ctx, err, map[string]string{
+			"schema": p.schema,
+		})
+		return nil, err
+	}
+
+	dbStats := make([]dbStat, 0, limit)
+	err = conn.SelectContext(
+		ctx,
+		&dbStats,
+		`select
+			id, data_format_version, player_uuid, queried_at, player_data
+		from stats
+		where
+			player_uuid = $1
+		order by queried_at desc
+		limit $2`,
+		playerUUID, limit)
+	if err != nil {
+		err := fmt.Errorf("failed to select recent stats: %w", err)
+		reporting.Report(ctx, err, map[string]string{
+			"uuid":  playerUUID,
+			"limit": strconv.Itoa(limit),
+		})
+		return nil, err
+	}
+
+	// The query returns newest-first; reverse to ascending queried_at order so
+	// callers (and ComputeSessions) get a chronological slice, matching
+	// GetPlayerPITs' ordering.
+	slices.Reverse(dbStats)
+
+	stats := make([]domain.PlayerPIT, 0, len(dbStats))
+	for _, dbStat := range dbStats {
+		player, err := dbStatToPlayerPIT(dbStat)
+		if err != nil {
+			err := fmt.Errorf("failed to convert db stat to playerpit: %w", err)
+			reporting.Report(ctx, err, map[string]string{
+				"statID": dbStat.ID,
+			})
+			return nil, err
+		}
+		stats = append(stats, *player)
+	}
+
+	return stats, nil
+}
+
 func (p *PostgresPlayerRepository) FindMilestoneAchievements(ctx context.Context, playerUUID string, gamemode domain.Gamemode, stat domain.Stat, milestones []int64) ([]domain.MilestoneAchievement, error) {
 	ctx, span := p.tracer.Start(ctx, "PostgresPlayerRepository.FindMilestoneAchievements")
 	defer span.End()
@@ -851,6 +930,10 @@ func (p *StubPlayerRepository) GetPlayerPITs(ctx context.Context, playerUUID str
 
 func (p *StubPlayerRepository) GetMostRecentPlayerPIT(ctx context.Context, playerUUID string) (*domain.PlayerPIT, error) {
 	return nil, domain.ErrPlayerNotFound
+}
+
+func (p *StubPlayerRepository) GetRecentPlayerPITs(ctx context.Context, playerUUID string, limit int) ([]domain.PlayerPIT, error) {
+	return []domain.PlayerPIT{}, nil
 }
 
 func (p *StubPlayerRepository) FindMilestoneAchievements(ctx context.Context, playerUUID string, gamemode domain.Gamemode, stat domain.Stat, milestones []int64) ([]domain.MilestoneAchievement, error) {

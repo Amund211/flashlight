@@ -202,7 +202,7 @@ func main() {
 
 	getSessionAt := app.BuildGetSessionAt(getPlayerPITs, computeSessions)
 
-	getLatestSession := app.BuildGetLatestSession(playerRepo, getSessionAt)
+	getLatestSession := app.BuildGetLatestSession(playerRepo, computeSessions, getSessionAt)
 
 	findMilestoneAchievements := app.BuildFindMilestoneAchievements(
 		playerRepo,
