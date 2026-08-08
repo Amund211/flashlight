@@ -46,6 +46,7 @@ func TestBuildGetHistory(t *testing.T) {
 		t.Parallel()
 
 		uuid := domaintest.NewUUID(t)
+		builder := domaintest.NewPlayerBuilder(uuid)
 
 		timeCases := []struct {
 			name  string
@@ -105,8 +106,8 @@ func TestBuildGetHistory(t *testing.T) {
 			{
 				name: "non-empty history",
 				history: []domain.PlayerPIT{
-					domaintest.NewPlayerBuilder(uuid).WithExperience(500).Build(now),
-					domaintest.NewPlayerBuilder(uuid).WithExperience(501).Build(now),
+					builder.WithExperience(500).Build(now),
+					builder.WithExperience(501).Build(now),
 				},
 			},
 		}
@@ -148,13 +149,14 @@ func TestBuildGetHistory(t *testing.T) {
 		t.Parallel()
 
 		uuid := "12345678-1234-1234-1234-123456789012"
+		builder := domaintest.NewPlayerBuilder(uuid)
 
 		start := time.Date(2024, time.March, 1, 0, 0, 0, 0, time.UTC)
 		end := time.Date(2024, time.March, 31, 23, 59, 59, 999_999_999, time.UTC)
 
 		expectedHistory := []domain.PlayerPIT{
-			domaintest.NewPlayerBuilder(uuid).WithExperience(500).Build(now),
-			domaintest.NewPlayerBuilder(uuid).WithExperience(501).Build(now),
+			builder.WithExperience(500).Build(now),
+			builder.WithExperience(501).Build(now),
 		}
 
 		updatePlayerInIntervalCalled := false
