@@ -1,6 +1,7 @@
 package ports
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -155,58 +156,16 @@ func MakeGetSessionAtHandler(
 			return
 		}
 
-		response := rainbowSessionAtResponse{
-			Session: nil,
-			Games:   make([]rainbowGameSegment, 0, len(result.Games)),
-		}
-		if result.Session != nil {
-			rbSession := sessionToRainbowSession(result.Session)
-			response.Session = &rbSession
-		}
-		for _, seg := range result.Games {
-			var game *rainbowGameResult
-			if seg.Game != nil {
-				rainbowGamemode, gErr := gamemodeToRainbowGamemode(seg.Game.Gamemode)
-				if gErr != nil {
-					reporting.Report(ctx, fmt.Errorf("failed to convert gamemode: %w", gErr))
-					http.Error(w, "Failed to serialise response", http.StatusInternalServerError)
-					return
-				}
-				rainbowOutcome, oErr := gameOutcomeToRainbowOutcome(seg.Game.Outcome)
-				if oErr != nil {
-					reporting.Report(ctx, fmt.Errorf("failed to convert outcome: %w", oErr))
-					http.Error(w, "Failed to serialise response", http.StatusInternalServerError)
-					return
-				}
-				game = &rainbowGameResult{
-					Gamemode:   rainbowGamemode,
-					Outcome:    rainbowOutcome,
-					FinalKills: seg.Game.FinalKills,
-					FinalDeath: seg.Game.FinalDeath,
-					BedsBroken: seg.Game.BedsBroken,
-					BedLost:    seg.Game.BedLost,
-					Kills:      seg.Game.Kills,
-					Deaths:     seg.Game.Deaths,
-					Experience: seg.Game.Experience,
-				}
-			}
-			response.Games = append(response.Games, rainbowGameSegment{
-				Start: playerToRainbowPlayerDataPIT(&seg.Start),
-				End:   playerToRainbowPlayerDataPIT(&seg.End),
-				Game:  game,
-			})
-		}
-
-		marshalled, err := json.Marshal(response)
+		marshalled, err := marshalRainbowSessionAtResponse(ctx, result)
 		if err != nil {
-			reporting.Report(ctx, fmt.Errorf("failed to marshal response: %w", err))
-			http.Error(w, "Failed to marshal response", http.StatusInternalServerError)
+			// NOTE: marshalRainbowSessionAtResponse handles its own error reporting
+			http.Error(w, "Failed to serialise response", http.StatusInternalServerError)
 			return
 		}
 
 		logging.FromContext(ctx).InfoContext(ctx, "Returning session at",
 			"hasSession", result.Session != nil,
-			"gamesLength", len(response.Games),
+			"gamesLength", len(result.Games),
 		)
 
 		w.Header().Set("Content-Type", "application/json")
@@ -220,4 +179,62 @@ func MakeGetSessionAtHandler(
 	}
 
 	return middleware(handler), stop
+}
+
+// marshalRainbowSessionAtResponse converts an app.SessionAtResult into the
+// rainbow-facing session-at wire format and marshals it to JSON. Both the
+// session-at and latest-session handlers use it so their response bodies are
+// byte-identical. Errors are reported to Sentry here; callers just surface a
+// 500.
+func marshalRainbowSessionAtResponse(ctx context.Context, result app.SessionAtResult) ([]byte, error) {
+	response := rainbowSessionAtResponse{
+		Session: nil,
+		Games:   make([]rainbowGameSegment, 0, len(result.Games)),
+	}
+	if result.Session != nil {
+		rbSession := sessionToRainbowSession(result.Session)
+		response.Session = &rbSession
+	}
+	for _, seg := range result.Games {
+		var game *rainbowGameResult
+		if seg.Game != nil {
+			rainbowGamemode, gErr := gamemodeToRainbowGamemode(seg.Game.Gamemode)
+			if gErr != nil {
+				err := fmt.Errorf("failed to convert gamemode: %w", gErr)
+				reporting.Report(ctx, err)
+				return nil, err
+			}
+			rainbowOutcome, oErr := gameOutcomeToRainbowOutcome(seg.Game.Outcome)
+			if oErr != nil {
+				err := fmt.Errorf("failed to convert outcome: %w", oErr)
+				reporting.Report(ctx, err)
+				return nil, err
+			}
+			game = &rainbowGameResult{
+				Gamemode:   rainbowGamemode,
+				Outcome:    rainbowOutcome,
+				FinalKills: seg.Game.FinalKills,
+				FinalDeath: seg.Game.FinalDeath,
+				BedsBroken: seg.Game.BedsBroken,
+				BedLost:    seg.Game.BedLost,
+				Kills:      seg.Game.Kills,
+				Deaths:     seg.Game.Deaths,
+				Experience: seg.Game.Experience,
+			}
+		}
+		response.Games = append(response.Games, rainbowGameSegment{
+			Start: playerToRainbowPlayerDataPIT(&seg.Start),
+			End:   playerToRainbowPlayerDataPIT(&seg.End),
+			Game:  game,
+		})
+	}
+
+	marshalled, err := json.Marshal(response)
+	if err != nil {
+		err := fmt.Errorf("failed to marshal response: %w", err)
+		reporting.Report(ctx, err)
+		return nil, err
+	}
+
+	return marshalled, nil
 }
