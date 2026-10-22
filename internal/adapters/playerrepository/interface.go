@@ -16,5 +16,13 @@ type PlayerRepository interface {
 	CountStats(ctx context.Context, playerUUID string) (int, error)
 	GetHistory(ctx context.Context, playerUUID string, start, end time.Time, limit int) ([]domain.PlayerPIT, error)
 	GetPlayerPITs(ctx context.Context, playerUUID string, start, end time.Time) ([]domain.PlayerPIT, error)
+	// GetMostRecentPlayerPIT returns the most recently queried stat stored for
+	// the player, or domain.ErrPlayerNotFound if none exist.
+	GetMostRecentPlayerPIT(ctx context.Context, playerUUID string) (*domain.PlayerPIT, error)
+	// GetRecentPlayerPITs returns up to limit of the player's most recently
+	// queried stats, in ascending queried_at order (oldest first). Unlike
+	// GetHistory it does not downsample — every stored row in the most recent
+	// limit is returned, so the result is safe to run session computation over.
+	GetRecentPlayerPITs(ctx context.Context, playerUUID string, limit int) ([]domain.PlayerPIT, error)
 	FindMilestoneAchievements(ctx context.Context, playerUUID string, gamemode domain.Gamemode, stat domain.Stat, milestones []int64) ([]domain.MilestoneAchievement, error)
 }

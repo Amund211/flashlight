@@ -676,6 +676,172 @@ func TestPostgresPlayerRepository(t *testing.T) {
 		})
 	})
 
+	t.Run("GetMostRecentPlayerPIT", func(t *testing.T) {
+		t.Parallel()
+		p := newPostgresPlayerRepository(t, db, "get_most_recent_player_pit_tests")
+
+		now := time.Now().Truncate(time.Millisecond)
+
+		storePlayers := func(t *testing.T, p PlayerRepository, players ...*domain.PlayerPIT) {
+			t.Helper()
+			for _, player := range players {
+				err := p.StorePlayer(ctx, player)
+				require.NoError(t, err)
+			}
+		}
+
+		t.Run("returns the most recently queried stat", func(t *testing.T) {
+			t.Parallel()
+
+			playerUUID := domaintest.NewUUID(t)
+
+			p1 := domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(1).BuildPtr(now.Add(-2 * time.Hour))
+			p2 := domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(2).BuildPtr(now.Add(-1 * time.Hour))
+			p3 := domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(3).BuildPtr(now)
+
+			// Store out of chronological order to make sure ordering is by
+			// queried_at, not insertion order.
+			storePlayers(t, p, p2, p3, p1)
+
+			mostRecent, err := p.GetMostRecentPlayerPIT(ctx, playerUUID)
+			require.NoError(t, err)
+			require.NotNil(t, mostRecent)
+			require.Equal(t, playerUUID, mostRecent.UUID)
+			require.WithinDuration(t, p3.QueriedAt, mostRecent.QueriedAt, 0)
+			require.Equal(t, 3, mostRecent.Fours.GamesPlayed)
+			requireValidDBID(t, mostRecent.DBID)
+		})
+
+		t.Run("returns ErrPlayerNotFound when the player has no stats", func(t *testing.T) {
+			t.Parallel()
+
+			playerUUID := domaintest.NewUUID(t)
+
+			mostRecent, err := p.GetMostRecentPlayerPIT(ctx, playerUUID)
+			require.ErrorIs(t, err, domain.ErrPlayerNotFound)
+			require.Nil(t, mostRecent)
+		})
+
+		t.Run("does not return another player's stats", func(t *testing.T) {
+			t.Parallel()
+
+			playerUUID := domaintest.NewUUID(t)
+			otherUUID := domaintest.NewUUID(t)
+
+			own := domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(5).BuildPtr(now.Add(-1 * time.Hour))
+			// Other player has a more recent stat, which must not be returned.
+			other := domaintest.NewPlayerBuilder(otherUUID).Fours().WithGamesPlayed(9).BuildPtr(now)
+			storePlayers(t, p, own, other)
+
+			mostRecent, err := p.GetMostRecentPlayerPIT(ctx, playerUUID)
+			require.NoError(t, err)
+			require.NotNil(t, mostRecent)
+			require.Equal(t, playerUUID, mostRecent.UUID)
+			require.Equal(t, 5, mostRecent.Fours.GamesPlayed)
+		})
+	})
+
+	t.Run("GetRecentPlayerPITs", func(t *testing.T) {
+		t.Parallel()
+		p := newPostgresPlayerRepository(t, db, "get_recent_player_pits_tests")
+
+		now := time.Now().Truncate(time.Millisecond)
+
+		storePlayers := func(t *testing.T, p PlayerRepository, players ...*domain.PlayerPIT) {
+			t.Helper()
+			for _, player := range players {
+				err := p.StorePlayer(ctx, player)
+				require.NoError(t, err)
+			}
+		}
+
+		gamesPlayed := func(pits []domain.PlayerPIT) []int {
+			out := make([]int, len(pits))
+			for i, pit := range pits {
+				out[i] = pit.Fours.GamesPlayed
+			}
+			return out
+		}
+
+		t.Run("returns recent stats in ascending queried_at order", func(t *testing.T) {
+			t.Parallel()
+
+			playerUUID := domaintest.NewUUID(t)
+
+			p1 := domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(1).BuildPtr(now.Add(-2 * time.Hour))
+			p2 := domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(2).BuildPtr(now.Add(-1 * time.Hour))
+			p3 := domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(3).BuildPtr(now)
+
+			// Store out of chronological order to prove ordering is by
+			// queried_at, not insertion order.
+			storePlayers(t, p, p2, p3, p1)
+
+			recent, err := p.GetRecentPlayerPITs(ctx, playerUUID, 10)
+			require.NoError(t, err)
+			require.Equal(t, []int{1, 2, 3}, gamesPlayed(recent))
+			require.WithinDuration(t, p1.QueriedAt, recent[0].QueriedAt, 0)
+			require.WithinDuration(t, p3.QueriedAt, recent[2].QueriedAt, 0)
+			requireValidDBID(t, recent[0].DBID)
+		})
+
+		t.Run("returns only the most recent limit stats, still ascending", func(t *testing.T) {
+			t.Parallel()
+
+			playerUUID := domaintest.NewUUID(t)
+
+			players := make([]*domain.PlayerPIT, 5)
+			for i := range players {
+				players[i] = domaintest.NewPlayerBuilder(playerUUID).
+					Fours().WithGamesPlayed(i + 1).
+					BuildPtr(now.Add(time.Duration(i-4) * time.Hour))
+			}
+			storePlayers(t, p, players...)
+
+			recent, err := p.GetRecentPlayerPITs(ctx, playerUUID, 3)
+			require.NoError(t, err)
+			// The three newest (games 3,4,5), oldest-first.
+			require.Equal(t, []int{3, 4, 5}, gamesPlayed(recent))
+		})
+
+		t.Run("returns empty when the player has no stats", func(t *testing.T) {
+			t.Parallel()
+
+			playerUUID := domaintest.NewUUID(t)
+
+			recent, err := p.GetRecentPlayerPITs(ctx, playerUUID, 10)
+			require.NoError(t, err)
+			require.Empty(t, recent)
+		})
+
+		t.Run("does not return another player's stats", func(t *testing.T) {
+			t.Parallel()
+
+			playerUUID := domaintest.NewUUID(t)
+			otherUUID := domaintest.NewUUID(t)
+
+			own := domaintest.NewPlayerBuilder(playerUUID).Fours().WithGamesPlayed(5).BuildPtr(now.Add(-1 * time.Hour))
+			// Other player has a more recent stat, which must not be returned.
+			other := domaintest.NewPlayerBuilder(otherUUID).Fours().WithGamesPlayed(9).BuildPtr(now)
+			storePlayers(t, p, own, other)
+
+			recent, err := p.GetRecentPlayerPITs(ctx, playerUUID, 10)
+			require.NoError(t, err)
+			require.Equal(t, []int{5}, gamesPlayed(recent))
+		})
+
+		t.Run("rejects an out-of-range limit", func(t *testing.T) {
+			t.Parallel()
+
+			playerUUID := domaintest.NewUUID(t)
+
+			_, err := p.GetRecentPlayerPITs(ctx, playerUUID, 0)
+			require.Error(t, err)
+
+			_, err = p.GetRecentPlayerPITs(ctx, playerUUID, 1001)
+			require.Error(t, err)
+		})
+	})
+
 	t.Run("GetHistory", func(t *testing.T) {
 		t.Parallel()
 
