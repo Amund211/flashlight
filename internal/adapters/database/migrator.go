@@ -35,6 +35,18 @@ func (m *migrator) Migrate(ctx context.Context, schemaName string) error {
 }
 
 func (m *migrator) migrate(ctx context.Context, schemaName string) error {
+	// Create pg_trgm extension if it doesn't exist (database-wide, not schema-specific)
+	// This must be done in a separate connection that is committed before migrations start
+	extensionConn, err := m.db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("migrate: failed to connect for extension creation: %w", err)
+	}
+	_, err = extensionConn.ExecContext(ctx, "CREATE EXTENSION IF NOT EXISTS pg_trgm SCHEMA public")
+	extensionConn.Close() // Close connection to commit the extension creation
+	if err != nil {
+		return fmt.Errorf("migrate: failed to create pg_trgm extension: %w", err)
+	}
+
 	conn, err := m.db.Conn(ctx)
 	if err != nil {
 		return fmt.Errorf("migrate: failed to connect to db: %w", err)
@@ -46,7 +58,8 @@ func (m *migrator) migrate(ctx context.Context, schemaName string) error {
 		return fmt.Errorf("migrate: failed to create schema: %w", err)
 	}
 
-	_, err = conn.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s", pq.QuoteIdentifier(schemaName)))
+	// Set search_path to include both the schema and public (where pg_trgm is installed)
+	_, err = conn.ExecContext(ctx, fmt.Sprintf("SET search_path TO %s, public", pq.QuoteIdentifier(schemaName)))
 	if err != nil {
 		return fmt.Errorf("migrate: failed to set search path: %w", err)
 	}

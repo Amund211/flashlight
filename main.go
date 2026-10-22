@@ -386,6 +386,8 @@ func main() {
 		fail("Failed to initialize GetTagsWithCache", "error", err.Error())
 	}
 
+	searchUsername := app.BuildSearchUsername(accountRepo)
+
 	getHistory := app.BuildGetHistory(playerRepo, updatePlayerInInterval)
 
 	getPlayerPITs := app.BuildGetPlayerPITs(playerRepo, updatePlayerInInterval)
@@ -568,6 +570,15 @@ func main() {
 		)
 		handleFunc("GET /v1/auth/credentials", credentialsHandler, stopCredentials)
 	}
+
+	handleFunc(
+		"GET /v1/search/username",
+		ports.MakeSearchUsernameHandler(
+			searchUsername,
+			logger.With("port", "search_username"),
+			sentryMiddleware,
+		),
+	)
 
 	handleFunc(
 		"OPTIONS /v1/account/username/{username}",
