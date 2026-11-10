@@ -1,5 +1,9 @@
 <h1 align="center">Flashlight</h1>
 
+> [!IMPORTANT]
+> Flashlight has moved to [Amund211/prism](https://github.com/Amund211/prism/tree/main/flashlight)
+> (in `flashlight/`), with full history. This repository is archived.
+
 
 ## Description
 Flashlight is a proxy to the Hypixel API (not associated) built as the backend for the [prism overlay](https://github.com/Amund211/prism).
